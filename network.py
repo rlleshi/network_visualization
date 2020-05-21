@@ -120,83 +120,80 @@ def build_graph(nodes, edges):
     return G
 
 
-def get_search_indices2(search, G):
-    """Get the search indices of the searched node without its sK parent.
-    Note: Because of error handling a separate function had to be declared.
+def get_search_indices(search, G):
+    """Get the search indices of the searched nodes.
+       The user can search individual nodes, nodes with the sK parent and paths.
+       This method will return the corresponding indices for the nodes.
 
     Arguments:
-        search {string} -- The node to be searched
-        G {Graph} -- The graph where the node will be searched
-
-    Returns:
-        list -- A list of indices
-    """
-
-    highlighted_indices = []
-    for node in G.nodes:
-        if node.lstrip(" ").rstrip(" ") ==search:
-            highlighted_indices.append(node)
-
-    Gnodes = np.array(G.nodes)
-    highlighted_indices = [int(np.where(Gnodes==node)[0]) for node in highlighted_indices]
-    return highlighted_indices
-
-
-def get_search_indices1(search, G):
-    """Get the search indices of the searched nodes. This method will return indices for
-       the searched node, the parent sK as well as the neighboring sK.
-
-    Arguments:
-        search {string} -- The node to be searched
+        search {string} -- The node, nodes to be searched
         G {Graph} -- The graph where the node will be searched
 
     Returns:
         list -- A list of indices of the searched nodes
+        search1 -- First type of search, node with sK
+        search2 -- Second type of search, only a node
     """
+    # search1: searching for a node and its sK
+    # search2: searching only for a node
+    search1 = True
+    search2 = False
 
-    # Throws an error if the format is not as specified
-    search, sk = search.split(",")
+    try:
+        search, sk = search.split(",")
+    except ValueError:
+        search1 = False
+        search2 = True
 
-    # Flag to check if the node search combination was found
-    found=False
+    if search1:
+        # Flag to check if the node search combination was found
+        found=False
 
-    # Get the real value of the original node
-    # When the graph was generated, random spaces were mixed with the node name because
-    # many node occur more than once
-    for node in G.nodes:
-        if len(G.nodes[node].items()) > 0:
-            if (G.nodes[node]['sk'] == sk) & (node.lstrip(" ").rstrip(" ")==search):
-                search=node
-                found=True
-                break
+        # Get the real value of the original node. When the graph was generated,
+        # random spaces were mixed with the node name because many nodes occur
+        # more than once and a node name must be unique
+        for node in G.nodes:
+            if len(G.nodes[node].items()) > 0:
+                if (G.nodes[node]['sk'] == sk) & (node.lstrip(" ").rstrip(" ")==search):
+                    search=node
+                    found=True
+                    break
 
-    # The nodes that will be highlighted. This includes by default the searched node
-    # and its sK parent node. Optionally, if there is an outgoing edge, the neighboring
-    # node is also highlighted
-    highlighted=[]
-    if found:
-        # Add parent sK node
-        highlighted.append(sk)
+        # The nodes that will be highlighted. This includes by default the searched node
+        # and its sK parent node. Optionally, if there is an outgoing edge, the neighboring
+        # node is also highlighted
+        highlighted=[]
+        if found:
+            # First we add all the sk nodes and then the attributes
+            # Add parent sK node
+            highlighted.append(sk)
 
-        # Add the neighboring Sk if an edge is going out
-        for edge in G.edges:
-            if edge[0] == sk:
-                if edge[1].find("sK") != -1:
-                    # neighbor_sk=edge[1]
-                    highlighted.append(edge[1])
+            # Add the neighboring Sk if an edge is going out
+            for edge in G.edges:
+                if edge[0] == sk:
+                    if edge[1].find("sK") != -1:
+                        highlighted.append(edge[1])
 
-        highlighted.append(search)
+            highlighted.append(search)
 
-        # Turn the list to the corresponding node indices
-        # Throws an error if the nodes do not exist (parent sk, searched or both)
+            # Turn the list to the corresponding node indices
+            Gnodes = np.array(G.nodes)
+            highlighted=[int(np.where(Gnodes==node)[0]) for node in highlighted]
+        return highlighted, search1, search2
+
+    elif search2:
+        highlighted = []
+        for node in G.nodes:
+            if node.lstrip(" ").rstrip(" ") == search:
+                highlighted.append(node)
+
         Gnodes = np.array(G.nodes)
-        highlighted=[int(np.where(Gnodes==node)[0]) for node in highlighted]
-
-    return highlighted
+        highlighted = [int(np.where(Gnodes==node)[0]) for node in highlighted]
+        return highlighted, search1, search2
 
 
 #TODO Method documentation
-def visualize_graph(search1='', search2='', content='', file_extension=''):
+def visualize_graph(searchValue='', content='', file_extension=''):
 
     # Parse nodes and edges
     nodes, edges = process_file(content, file_extension)
@@ -228,43 +225,35 @@ def visualize_graph(search1='', search2='', content='', file_extension=''):
     highlighted=[]
     # String containing error messages
     errorMessage=" "
+    search1=False
+    search2=False
 
     # A node has been searched
-    if len(search1)>0:
-        # Searched for a node and its sK parent
-        try:
-            highlighted = get_search_indices1(search1, G)
-        except ValueError:
-            errorMessage="""
-                Given input is not in the correct format.
+    if len(searchValue)>0:
 
-                Correct format is: node,sKx
-                """
+        highlighted, search1, search2 = get_search_indices(searchValue, G)
+
         if len(highlighted)==0:
             errorMessage="The searched node does not exist."
         else:
-            # If length is two, then there is only one sK node to highlight. This also means
-            # that there was no outgoing edge from the parent sK to any neighboring sk
-            if len(highlighted) == 2:
-                node_color[highlighted[0]] = 0.3
-                node_color[highlighted[1]] = 0.5
-            else:
+            if search1:
+                # First search type was performed (refer to get_search_indices docs for more info)
+                #
+                # If length is two, then there is only one sK node to highlight. This means
+                # that there was no outgoing edge from the parent sK to any neighboring sk
+                if len(highlighted) == 2:
+                    node_color[highlighted[0]] = 0.3
+                    node_color[highlighted[1]] = 0.5
+                else:
+                    for i in range(len(highlighted)):
+                        if i<len(highlighted)-1:
+                            node_color[highlighted[i]] = 0.3
+                        else:
+                            node_color[highlighted[i]] = 0.5
+            elif search2:
+                # A node was searched irrespective of sK
                 for i in range(len(highlighted)):
-                    if i<len(highlighted)-1:
-                        node_color[highlighted[i]] = 0.3
-                    else:
-                        node_color[highlighted[i]] = 0.5
-    elif len(search2)>0:
-        # A node was searched irrespective of sK
-        try:
-            highlighted = get_search_indices2(search2, G)
-        except TypeError:
-            errorMessage="The searched node does not exist."
-        else:
-            if len(highlighted) == 0:
-                errorMessage="The searched node does not exist."
-            for i in range(len(highlighted)):
-                node_color[highlighted[i]] = 0.5
+                    node_color[highlighted[i]] = 0.5
 
     # Edges information for edge trace
     edge_x = []
@@ -294,7 +283,7 @@ def visualize_graph(search1='', search2='', content='', file_extension=''):
         else:
             edge_labels.append((None, None, None))
 
-    if (len(search1) > 0) & (len(highlighted)>0):
+    if (len(highlighted)>0) & (search1==True):
         # create node trace with multiple colors according to the highlighted nodes (including sk)
         node_trace = go.Scatter( x=node_x, y=node_y, text=node_labels, textposition='bottom center',
                         mode='markers+text', hoverinfo='text', name='Nodes',
@@ -307,7 +296,7 @@ def visualize_graph(search1='', search2='', content='', file_extension=''):
                         size=15,
                         line=dict(color='rgb(180,255,255)', width=1))
                             )
-    elif (len(search2) > 0) & (len(highlighted)>0):
+    elif (len(highlighted)>0) & (search2==True):
         # create node trace with multiple colors according to the highlighted nodes (excluding sk)
         node_trace = go.Scatter( x=node_x, y=node_y, text=node_labels, textposition='bottom center',
                         mode='markers+text', hoverinfo='text', name='Nodes',
@@ -436,60 +425,52 @@ if __name__ == '__main__':
                     className='two columns',
                     children=[
                         dcc.Markdown(d("""
-                        **Search Node with its Instantiation**
+                        **Search Node **
 
-                        Input the node and its instantiation.
+                        Search for individual nodes, connecting nodes or paths.
                         """)),
-                        dcc.Input(id='input1', type='text', placeholder='node,sKx', value='',
+                        dcc.Input(id='input', type='text', placeholder='node', value='',
                                 debounce=True),
                         html.Div(id="output1", style={'margin-top': '100px'}),
                     ],
                     style={'margin-left': '200px', 'height': '300px'}
                 ),
-                html.Div(
-                    className='two columns',
-                    children=[
-                        dcc.Markdown(d("""
-                            **Search Node without Instantiation**
-
-                            Input only the node.
-                            """)),
-                        dcc.Input(id='input2', type='text', placeholder='node', value='',
-                                debounce=True),
-                        html.Div(id="output2")
-                    ],
-                    style={'margin-left': '200px', 'margin-top':'80px', 'height': '300px'}
-                )
             ]
         )
     ])
 
-    ###### Callback search components and file component
+    ###### Callback for search and file component
     @app.callback(
         [dash.dependencies.Output(component_id='fol-graph', component_property='figure'),
         dash.dependencies.Output('output1', 'children')],
-        [dash.dependencies.Input(component_id='input1', component_property='value'),
-        dash.dependencies.Input('input2', 'value'),
+        [dash.dependencies.Input(component_id='input', component_property='value'),
         dash.dependencies.Input('upload-data', 'contents'),],
         [dash.dependencies.State('upload-data', 'filename'),],
     )
-    def search_update(value1, value2, content, filepath):
+    def search_update(search_value, content, filepath):
+        """Update the graph when the user picks a new file or searches something.
+
+        Arguments:
+            search_value {[type]} -- [description]
+            value2 {[type]} -- [description]
+            content {[type]} -- [description]
+            filepath {[type]} -- [description]
+
+        Returns:
+            [type] -- [description]
+        """
         if content is not None:
             # File has been choosen
             content_string = content.split(',')[1]
             decoded_content = base64.b64decode(content_string).decode('utf-8')
             file_extension = filepath.split(".")[1]
 
-            # Only one search works at one time
-            if (len(value1)>0) & (len(value2)>0):
-                graph, error = visualize_graph(content=decoded_content, file_extension=file_extension)
-                error="Can only use one search box at a time."
-            else:
-                # Rebuild the graph over again for every new search initiated
-                graph, error = visualize_graph(value1, value2, decoded_content, file_extension)
-                if len(error)>0:
-                    print("Error:", error)
+            # Rebuild the graph over again for every new search initiated
+            graph, error = visualize_graph(search_value, decoded_content, file_extension)
+            if len(error)>1:
+                print("Error:", error)
             return graph, error
+        # If no file has been selected return the empty fig
         return fig,""
 
     ###### Start server
