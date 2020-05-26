@@ -10,13 +10,19 @@ import networkx as nx
 import plotly.graph_objs as go
 from textwrap import dedent as d
 
+##################################################################################################################################
+# Docs on NetworkX: https://networkx.github.io/documentation/stable/index.html
+#
+# Docs on Dash Plotly: https://dash.plotly.com/
+#
+# Docs on Plotly: https://plotly.com/python/network-graphs/
+##################################################################################################################################
+
 
 # import the css template, and pass the css template into dash
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 app.title = "FOL Network"
-
-##################################################################################################################################
 
 #TODO Refactor for new file versions
 def process_file(content, file_extension):
@@ -55,14 +61,12 @@ def process_file(content, file_extension):
 
     return nodes, edges
 
-
 def rreplace(string, old, new, occurrence):
     """ Replace function constructed to replace the last occurrences of a string.
         Python's inbuild function only works starting from the beginning and not the end.
     """
     li = string.rsplit(old, occurrence)
     return new.join(li)
-
 
 #TODO Refactor for new file versions
 def build_graph(nodes, edges):
@@ -119,10 +123,10 @@ def build_graph(nodes, edges):
 
     return G
 
-
 def get_search_indices(search, G):
     """Get the search indices of the searched nodes.
        The user can search individual nodes, nodes with the sK parent and paths.
+       Paths can be searched only between attributes of nodes.
        This method will return the corresponding indices for the nodes.
 
     Arguments:
@@ -133,9 +137,9 @@ def get_search_indices(search, G):
         list -- A list of indices of the searched nodes
         search1 -- First type of search, node with sK
         search2 -- Second type of search, only a node
+        search3 -- Third type of search, paths
     """
-    # search1: searching for a node and its sK
-    # search2: searching only for a node
+
     search1 = True
     search2 = False
 
@@ -190,7 +194,6 @@ def get_search_indices(search, G):
         Gnodes = np.array(G.nodes)
         highlighted = [int(np.where(Gnodes==node)[0]) for node in highlighted]
         return highlighted, search1, search2
-
 
 #TODO Method documentation
 def visualize_graph(searchValue='', content='', file_extension=''):
@@ -254,7 +257,8 @@ def visualize_graph(searchValue='', content='', file_extension=''):
                 # A node was searched irrespective of sK
                 for i in range(len(highlighted)):
                     node_color[highlighted[i]] = 0.5
-
+    print("*********** Node COLORS ***********")
+    print(node_color)
     # Edges information for edge trace
     edge_x = []
     edge_y = []
@@ -362,7 +366,6 @@ def visualize_graph(searchValue='', content='', file_extension=''):
     fig = go.Figure(data=data, layout=layout)
     return fig, errorMessage
 
-
 ##################################################################################################################################
 
 
@@ -420,7 +423,8 @@ if __name__ == '__main__':
                     className="eight columns",
                     children=[dcc.Graph(id='fol-graph', figure=fig)]
                 ),
-            ### Left side search components
+
+            ### Left side components
                 html.Div(
                     className='two columns',
                     children=[
@@ -432,6 +436,9 @@ if __name__ == '__main__':
                         dcc.Input(id='input', type='text', placeholder='node', value='',
                                 debounce=True),
                         html.Div(id="output1", style={'margin-top': '100px'}),
+
+                        ### Button for graph paths
+                        html.Button('Next Path', id='next-path', n_clicks=0, hidden=True,),
                     ],
                     style={'margin-left': '200px', 'height': '300px'}
                 ),
@@ -441,7 +448,8 @@ if __name__ == '__main__':
 
     ###### Callback for search and file component
     @app.callback(
-        [dash.dependencies.Output(component_id='fol-graph', component_property='figure'),
+        [dash.dependencies.Output(component_id='next-path', component_property='style'),
+        dash.dependencies.Output(component_id='fol-graph', component_property='figure'),
         dash.dependencies.Output('output1', 'children')],
         [dash.dependencies.Input(component_id='input', component_property='value'),
         dash.dependencies.Input('upload-data', 'contents'),],
@@ -469,9 +477,13 @@ if __name__ == '__main__':
             graph, error = visualize_graph(search_value, decoded_content, file_extension)
             if len(error)>1:
                 print("Error:", error)
+
+            a = [1,2]
+            if len(a)>0:
+                return {'display':'block'}, graph, error
             return graph, error
         # If no file has been selected return the empty fig
-        return fig,""
+        return {'display':'none'},fig,""
 
     ###### Start server
     app.run_server(debug=True, use_reloader=False)
