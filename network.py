@@ -24,6 +24,9 @@ external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 app.title = "FOL Network"
 
+# Global variable that will save the paths that are searched for
+node_paths=[]
+
 #TODO Refactor for new file versions
 def process_file(content, file_extension):
     """ Process the text file containing the graph and return its nodes and edges.
@@ -129,6 +132,9 @@ def get_search_indices(search, G):
        Paths can be searched only between attributes of nodes.
        This method will return the corresponding indices for the nodes.
 
+      #TODO Refactor the Gnodes variable as it is used 3 times
+      #TODO Refactor the return line
+
     Arguments:
         search {string} -- The node, nodes to be searched
         G {Graph} -- The graph where the node will be searched
@@ -142,9 +148,15 @@ def get_search_indices(search, G):
 
     search1 = True
     search2 = False
+    search3 = False
 
     try:
         search, sk = search.split(",")
+
+        # Check if a path has been searched
+        if (search.find('sK') == -1) & (sk.find('sK') == -1):
+            search1=False
+            search3=True
     except ValueError:
         search1 = False
         search2 = True
@@ -183,7 +195,7 @@ def get_search_indices(search, G):
             # Turn the list to the corresponding node indices
             Gnodes = np.array(G.nodes)
             highlighted=[int(np.where(Gnodes==node)[0]) for node in highlighted]
-        return highlighted, search1, search2
+        return highlighted, search1, search2, search3
 
     elif search2:
         highlighted = []
@@ -193,7 +205,54 @@ def get_search_indices(search, G):
 
         Gnodes = np.array(G.nodes)
         highlighted = [int(np.where(Gnodes==node)[0]) for node in highlighted]
-        return highlighted, search1, search2
+        return highlighted, search1, search2, search3
+    elif search3:
+        searchNodes = [search]
+
+        # In order to make it possible for nodes of the same name to be on the same graph, spaces
+        # have been  added to already existing nodes in the graph before they are added
+        # to this graph. (this is how the implementation was thought from day 1)
+        #
+        # We will add possible nodes to our searchNodes array by adding such spaces. They can
+        # have spaces before, after or both in the beginning of the word. Admittedly, this solution
+        # doesn't sound clean/right
+        for i in range(1, 4):
+            searchNodes.append(search+" "*i)
+            searchNodes.append(i*" "+search)
+            searchNodes.append(i*" "+search+" "*i)
+
+        searchNodes.append(sk)
+        for i in range(1,4):
+            searchNodes.append(sk+" "*i)
+            searchNodes.append(i*" "+sk)
+            searchNodes.append(i*" "+sk+" "*i)
+
+        # Now filter all the nodes that really are in the graph
+        searchNodes = [node for node in searchNodes if G.has_node(node)]
+
+        # Find the index where the second nodes start
+        pos = 0
+        for i in range(len(searchNodes)-1):
+            if searchNodes[i] != searchNodes[i-1]:
+                pos = i
+
+        # Finally, get the paths
+        highlighted=[]
+        for i in range(0, pos):
+            for j in range(pos, len(searchNodes)):
+        #         print("Examining: ", searchNodes[i], " ", searchNodes[j])
+                paths = nx.all_simple_paths(G, searchNodes[i], searchNodes[j])
+                for path in paths:
+                    highlighted.append(path)
+
+        # Assign the value to the global variable paths for future usage
+        node_paths = highlighted
+
+        # Return the indices for the first path
+        Gnodes = np.array(G.nodes)
+        if len(highlighted) > 0:
+            highlighted = [int(np.where(Gnodes==node)[0]) for node in highlighted[0]]
+        return highlighted, search1, search2, search3
 
 #TODO Method documentation
 def visualize_graph(searchValue='', content='', file_extension=''):
@@ -230,14 +289,15 @@ def visualize_graph(searchValue='', content='', file_extension=''):
     errorMessage=" "
     search1=False
     search2=False
+    search3=False
 
     # A node has been searched
     if len(searchValue)>0:
 
-        highlighted, search1, search2 = get_search_indices(searchValue, G)
+        highlighted, search1, search2, search3 = get_search_indices(searchValue, G)
 
         if len(highlighted)==0:
-            errorMessage="The searched node does not exist."
+            errorMessage="The searched node/path does not exist."
         else:
             if search1:
                 # First search type was performed (refer to get_search_indices docs for more info)
@@ -257,6 +317,11 @@ def visualize_graph(searchValue='', content='', file_extension=''):
                 # A node was searched irrespective of sK
                 for i in range(len(highlighted)):
                     node_color[highlighted[i]] = 0.5
+            elif search3:
+                # Paths have been searched
+                for i in range(len(highlighted)):
+                    node_color[highlighted[i]] = 0.5
+
     print("*********** Node COLORS ***********")
     print(node_color)
     # Edges information for edge trace
@@ -300,7 +365,7 @@ def visualize_graph(searchValue='', content='', file_extension=''):
                         size=15,
                         line=dict(color='rgb(180,255,255)', width=1))
                             )
-    elif (len(highlighted)>0) & (search2==True):
+    elif (len(highlighted)>0) & ((search2==True) | (search3==True)):
         # create node trace with multiple colors according to the highlighted nodes (excluding sk)
         node_trace = go.Scatter( x=node_x, y=node_y, text=node_labels, textposition='bottom center',
                         mode='markers+text', hoverinfo='text', name='Nodes',
@@ -478,10 +543,9 @@ if __name__ == '__main__':
             if len(error)>1:
                 print("Error:", error)
 
-            a = [1,2]
-            if len(a)>0:
+            if len(node_paths)>0:
                 return {'display':'block'}, graph, error
-            return graph, error
+            return {'display':'none'}, graph, error
         # If no file has been selected return the empty fig
         return {'display':'none'},fig,""
 
