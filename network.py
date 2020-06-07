@@ -29,8 +29,9 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 app.title = "FOL Network"
 
 # Global variable that will save the paths that are searched for
-# Alternatively we could store the value of this into some dash hidden component
+# If this app will be used by multiple ppl at the same time, this should not be a global variable
 node_paths=[]
+# Its very important to have a seed for graph stability considering the implementation
 random.seed(3)
 
 def process_file(content, file_extension):
@@ -43,7 +44,6 @@ def process_file(content, file_extension):
     Returns:
         list -- A list of nodes and edges of the graph
     """
-
     # Read the data -according to the file ending-, clean and split into an array
     if file_extension=='txt':
         data= [el.strip() for el in content.split(".")]
@@ -86,7 +86,6 @@ def build_graph(nodes, edges):
    Returns:
        DiGraph -- A directed graph representing the network
    """
-
     G = nx.DiGraph()
     # Add SK nodes
     [G.add_node(rreplace(node.split("(", maxsplit=1)[1], ")", "", 1)) for node in nodes]
@@ -127,7 +126,6 @@ def build_graph(nodes, edges):
                 for node2 in G.nodes():
                     if node2 == second:
                         G.add_edge(node, node2, Label = edge.split("(")[0])
-
     return G
 
 def get_search_indices(search, G):
@@ -592,14 +590,10 @@ if __name__ == '__main__':
         ctx = dash.callback_context
         component_name = ctx.triggered[0]['prop_id'].split('.')[0]
         component_value = ctx.triggered[0]['value']
-        # print("Component: ", component_name)
-        # print("Component value: ", component_value)
+
         if (component_value == None) | (component_value == 0):
             raise PreventUpdate
         if component_name == 'upload-data':
-            # if component_value == None:
-            #     # return fig, json.dumps(None), json.dumps(None), {'display':'none'}, ''
-            #     raise PreventUpdate
             content = content.split(',')[1]
             decoded_content = base64.b64decode(content).decode('utf-8')
             file_extension = filepath.split(".")[1]
@@ -609,7 +603,6 @@ if __name__ == '__main__':
 
             # Calculate node positions
             pos = nx.nx_pydot.graphviz_layout(G)
-
             graph, _ = visualize_graph(G, pos)
             return graph, json.dumps(json_graph.node_link_data(G)), json.dumps(pos), {'display': 'none'}, ''
 
