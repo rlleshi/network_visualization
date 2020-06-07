@@ -3,12 +3,16 @@ import random
 import numpy as np
 import base64
 import io
+import networkx as nx
+from networkx.readwrite import json_graph
+import json
+import plotly.graph_objs as go
+from textwrap import dedent as d
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
-import networkx as nx
-import plotly.graph_objs as go
-from textwrap import dedent as d
+from dash.exceptions import PreventUpdate
+
 
 ##################################################################################################################################
 # Docs on NetworkX: https://networkx.github.io/documentation/stable/index.html
@@ -25,9 +29,10 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 app.title = "FOL Network"
 
 # Global variable that will save the paths that are searched for
+# Alternatively we could store the value of this into some dash hidden component
 node_paths=[]
+random.seed(3)
 
-#TODO Refactor for new file versions
 def process_file(content, file_extension):
     """ Process the text file containing the graph and return its nodes and edges.
         Only processes .txt and .p files.
@@ -71,7 +76,6 @@ def rreplace(string, old, new, occurrence):
     li = string.rsplit(old, occurrence)
     return new.join(li)
 
-#TODO Refactor for new file versions
 def build_graph(nodes, edges):
     """Build a graph given its nodes and its edges.
 
@@ -213,7 +217,7 @@ def get_search_indices(search, G):
         # have been  added to already existing nodes in the graph before they are added
         # to this graph. (this is how the implementation was thought from day 1)
         #
-        # We will add possible nodes to our searchNodes array by adding such spaces. They can
+        # We will add possible other nodes to our searchNodes array by adding such spaces. They can
         # have spaces before, after or both in the beginning of the word. Admittedly, this solution
         # doesn't sound clean/right
         for i in range(1, 4):
@@ -232,8 +236,8 @@ def get_search_indices(search, G):
 
         # Find the index where the second nodes start
         pos = 0
-        for i in range(len(searchNodes)-1):
-            if searchNodes[i] != searchNodes[i-1]:
+        for i in range(len(searchNodes)):
+            if searchNodes[i].strip() != searchNodes[i-1].strip():
                 pos = i
 
         # Finally, get the paths
@@ -246,6 +250,7 @@ def get_search_indices(search, G):
                     highlighted.append(path)
 
         # Assign the value to the global variable paths for future usage
+        global node_paths
         node_paths = highlighted
 
         # Return the indices for the first path
@@ -254,18 +259,36 @@ def get_search_indices(search, G):
             highlighted = [int(np.where(Gnodes==node)[0]) for node in highlighted[0]]
         return highlighted, search1, search2, search3
 
+def get_clicked_path(n_clicks, paths):
+    """Get the path according to the number of times the button was clicked.
+       The paths are stored in the global node_paths variable once
+
+    Arguments:
+        n_clicks {[type]} -- [description]
+        paths {[type]} -- [description]
+
+    Returns:
+        [type] -- [description]
+    """
+    if n_clicks < len(paths):
+        return paths[n_clicks]
+    else:
+        while n_clicks > len(paths)-1:
+            n_clicks = (n_clicks/len(paths)-1) * len(paths)
+        return paths[round(n_clicks)]
+
 #TODO Method documentation
-def visualize_graph(searchValue='', content='', file_extension=''):
+def visualize_graph(G, pos, searchValue='', highlighted=[]):
 
-    # Parse nodes and edges
-    nodes, edges = process_file(content, file_extension)
-    # Build graph
-    G = build_graph(nodes, edges)
+    # # Parse nodes and edges
+    # nodes, edges = process_file(content, file_extension)
+    # # Build graph
+    # G = build_graph(nodes, edges)
 
-    ########## Visualize the graph
+    # ########## Visualize the graph
 
-    # Set node positions
-    pos = nx.nx_pydot.graphviz_layout(G)
+    # # Set node positions
+    # pos = nx.nx_pydot.graphviz_layout(G)
 
     # Nodes information
     node_x = []
@@ -282,17 +305,41 @@ def visualize_graph(searchValue='', content='', file_extension=''):
     # if a node has been searched the color types can go up to four
     node_color = np.array([1.0 if node.find('sK')!=-1  else 0 for node in node_labels])
 
-    # Array containing nodes that are to be highlighted when searched
-    # The rest of the nodes will be blurred out
-    highlighted=[]
     # String containing error messages
     errorMessage=" "
     search1=False
     search2=False
     search3=False
 
+    # another path is being searched by clicking on the button
+    if len(highlighted) > 0:
+        # Convert node names to indices
+        Gnodes = np.array(G.nodes)
+        print("Is there any search value? ", searchValue)
+        print("Highlighted: ", highlighted)
+        # Get the indices
+        # highlighted=[int(np.where(Gnodes==node)[0]) for node in highlighted]
+        tmp = []
+        for node in highlighted:
+            tt1 = np.where(Gnodes==node)[0]
+            print(np.where(Gnodes==node))
+            print(tt1)
+            tt=int(np.where(Gnodes==node)[0])
+            tmp.append(tt)
+            print(tt)
+
+        highlighted = tmp
+
+        print("Indeces: ",highlighted)
+        for i in range(len(highlighted)):
+            node_color[highlighted[i]] = 0.5
+        search3 = True
+
     # A node has been searched
-    if len(searchValue)>0:
+    elif len(searchValue)>0:
+        # Reset any global paths
+        global node_paths
+        node_paths=[]
 
         highlighted, search1, search2, search3 = get_search_indices(searchValue, G)
 
@@ -313,17 +360,16 @@ def visualize_graph(searchValue='', content='', file_extension=''):
                             node_color[highlighted[i]] = 0.3
                         else:
                             node_color[highlighted[i]] = 0.5
-            elif search2:
+            elif (search2) | (search3):
                 # A node was searched irrespective of sK
-                for i in range(len(highlighted)):
-                    node_color[highlighted[i]] = 0.5
-            elif search3:
-                # Paths have been searched
+                # Or paths were searched
                 for i in range(len(highlighted)):
                     node_color[highlighted[i]] = 0.5
 
-    print("*********** Node COLORS ***********")
-    print(node_color)
+    # Attempt to debug the problem with color highlight with some files
+    # print("*********** Node COLORS ***********")
+    # print(node_color)
+
     # Edges information for edge trace
     edge_x = []
     edge_y = []
@@ -486,7 +532,12 @@ if __name__ == '__main__':
             ### Middle graph component
                 html.Div(
                     className="eight columns",
-                    children=[dcc.Graph(id='fol-graph', figure=fig)]
+                    children=[
+                        dcc.Graph(id='fol-graph', figure=fig),
+                        # We build the graph only once and store it here intermediately
+                        html.Div(id='graph-pos-intermediary', style={'display':'none'}),
+                        html.Div(id='graph-intermediary', style={'display':'none'}),
+                        ]
                 ),
 
             ### Left side components
@@ -500,10 +551,10 @@ if __name__ == '__main__':
                         """)),
                         dcc.Input(id='input', type='text', placeholder='node', value='',
                                 debounce=True),
-                        html.Div(id="output1", style={'margin-top': '100px'}),
+                        html.Div(id="error", style={'margin-top': '100px'}),
 
                         ### Button for graph paths
-                        html.Button('Next Path', id='next-path', n_clicks=0, hidden=True,),
+                        html.Button('Next Path', id='next-path-btn', n_clicks=0, hidden=True,),
                     ],
                     style={'margin-left': '200px', 'height': '300px'}
                 ),
@@ -511,17 +562,31 @@ if __name__ == '__main__':
         )
     ])
 
-    ###### Callback for search and file component
+    ###### Callback for all components
+    # TODO: Check this link for handling errors better
+    # TODO: https://dash.plotly.com/advanced-callbacks
     @app.callback(
-        [dash.dependencies.Output(component_id='next-path', component_property='style'),
-        dash.dependencies.Output(component_id='fol-graph', component_property='figure'),
-        dash.dependencies.Output('output1', 'children')],
-        [dash.dependencies.Input(component_id='input', component_property='value'),
-        dash.dependencies.Input('upload-data', 'contents'),],
-        [dash.dependencies.State('upload-data', 'filename'),],
+        [dash.dependencies.Output(component_id='fol-graph', component_property='figure'),
+        dash.dependencies.Output('graph-intermediary', 'children'),
+        dash.dependencies.Output('graph-pos-intermediary', 'children'),
+        dash.dependencies.Output('next-path-btn', 'style'),
+        dash.dependencies.Output('error', 'children')],
+
+        [dash.dependencies.Input(component_id='upload-data', component_property='contents'),
+        dash.dependencies.Input('input', 'value'),
+        # dash.dependencies.Input('graph-intermediary', 'children'),
+        # dash.dependencies.Input('graph-pos-intermediary', 'children'),
+        dash.dependencies.Input('next-path-btn', 'n_clicks'),],
+
+        [dash.dependencies.State('upload-data', 'filename'),
+        dash.dependencies.State('graph-intermediary', 'children'),
+        dash.dependencies.State('graph-pos-intermediary', 'children'),]
     )
-    def search_update(search_value, content, filepath):
-        """Update the graph when the user picks a new file or searches something.
+    # TODO: Method documentation
+    def process_graph(content, search_value, n_clicks, filepath,  G, pos,):
+        """Update/rebuild the graph when the user picks a new file or searches something.
+           Stores it and its nodes positions in an intermediary value (div in the app).
+           This little maneuver greatly improves computational time.
 
         Arguments:
             search_value {[type]} -- [description]
@@ -532,22 +597,48 @@ if __name__ == '__main__':
         Returns:
             [type] -- [description]
         """
-        if content is not None:
-            # File has been choosen
-            content_string = content.split(',')[1]
-            decoded_content = base64.b64decode(content_string).decode('utf-8')
+        ctx = dash.callback_context
+        component_name = ctx.triggered[0]['prop_id'].split('.')[0]
+        component_value = ctx.triggered[0]['value']
+        # print("Component: ", component_name)
+        # print("Component value: ", component_value)
+        if (component_value == None) | (component_value == 0):
+            raise PreventUpdate
+        if component_name == 'upload-data':
+            # if component_value == None:
+            #     # return fig, json.dumps(None), json.dumps(None), {'display':'none'}, ''
+            #     raise PreventUpdate
+            content = content.split(',')[1]
+            decoded_content = base64.b64decode(content).decode('utf-8')
             file_extension = filepath.split(".")[1]
 
-            # Rebuild the graph over again for every new search initiated
-            graph, error = visualize_graph(search_value, decoded_content, file_extension)
-            if len(error)>1:
-                print("Error:", error)
+            nodes, edges = process_file(decoded_content, file_extension)
+            G = build_graph(nodes, edges)
 
-            if len(node_paths)>0:
-                return {'display':'block'}, graph, error
-            return {'display':'none'}, graph, error
-        # If no file has been selected return the empty fig
-        return {'display':'none'},fig,""
+            # Calculate node positions
+            pos = nx.nx_pydot.graphviz_layout(G)
+
+            graph, _ = visualize_graph(G, pos)
+            return graph, json.dumps(json_graph.node_link_data(G)), json.dumps(pos), {'display': 'none'}, ''
+
+        else:
+            G = json_graph.node_link_graph(json.loads(G))
+            pos = json.loads(pos)
+            global node_paths
+
+            if component_name == 'input':
+                graph, error = visualize_graph(G, pos, search_value)
+                print("NOde paths length: ", len(node_paths))
+                if len(node_paths) > 1:
+                    return graph, json.dumps(json_graph.node_link_data(G)), json.dumps(pos), {'display': 'block'}, error
+                return graph, json.dumps(json_graph.node_link_data(G)), json.dumps(pos), {'display': 'none'}, error
+            elif (component_name == 'next-path-btn') & (component_value > 0):
+                if n_clicks > 0:
+                    # Display other paths
+                    highlighted = get_clicked_path(n_clicks, node_paths)
+                    graph, error = visualize_graph(G, pos, '', highlighted)
+                    return graph, json.dumps(json_graph.node_link_data(G)), json.dumps(pos), {'display': 'block'}, error
 
     ###### Start server
     app.run_server(debug=True, use_reloader=False)
+    # app.run_server(debug=True,dev_tools_ui=False,dev_tools_props_check=False)
