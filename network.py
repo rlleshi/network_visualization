@@ -482,7 +482,7 @@ def visualize_graph(G, pos, searchValue='', highlighted=[]):
 
 if __name__ == '__main__':
 
-    # Initialize the figure with no data
+    # Initialize the graph with no data
     fig = go.Figure(data=None, layout = go.Layout(
                 width = 1000,
                 height = 600,
@@ -498,7 +498,7 @@ if __name__ == '__main__':
     # Define app layout
     app.layout = html.Div([
         ### Title
-        html.Div([html.H1("FOL Network Graph")],
+        html.Div([html.H1("First-order Logic Network Graph")],
                 className="row",
                 style={'textAlign': "center"}),
 
@@ -534,7 +534,7 @@ if __name__ == '__main__':
                     className="eight columns",
                     children=[
                         dcc.Graph(id='fol-graph', figure=fig),
-                        # We build the graph only once and store it here intermediately
+                        # Store the graph and more importantly node positions here between callbacks
                         html.Div(id='graph-pos-intermediary', style={'display':'none'}),
                         html.Div(id='graph-intermediary', style={'display':'none'}),
                         ]
@@ -549,7 +549,7 @@ if __name__ == '__main__':
 
                         Search for individual nodes, connecting nodes or paths.
                         """)),
-                        dcc.Input(id='input', type='text', placeholder='node', value='',
+                        dcc.Input(id='input', type='text', placeholder='node/paths', value='',
                                 debounce=True),
                         html.Div(id="error", style={'margin-top': '100px'}),
 
@@ -563,8 +563,6 @@ if __name__ == '__main__':
     ])
 
     ###### Callback for all components
-    # TODO: Check this link for handling errors better
-    # TODO: https://dash.plotly.com/advanced-callbacks
     @app.callback(
         [dash.dependencies.Output(component_id='fol-graph', component_property='figure'),
         dash.dependencies.Output('graph-intermediary', 'children'),
@@ -574,28 +572,22 @@ if __name__ == '__main__':
 
         [dash.dependencies.Input(component_id='upload-data', component_property='contents'),
         dash.dependencies.Input('input', 'value'),
-        # dash.dependencies.Input('graph-intermediary', 'children'),
-        # dash.dependencies.Input('graph-pos-intermediary', 'children'),
         dash.dependencies.Input('next-path-btn', 'n_clicks'),],
 
         [dash.dependencies.State('upload-data', 'filename'),
         dash.dependencies.State('graph-intermediary', 'children'),
         dash.dependencies.State('graph-pos-intermediary', 'children'),]
     )
-    # TODO: Method documentation
-    def process_graph(content, search_value, n_clicks, filepath,  G, pos,):
-        """Update/rebuild the graph when the user picks a new file or searches something.
-           Stores it and its nodes positions in an intermediary value (div in the app).
+    def process_graph(content, search_value, n_clicks, filepath,  G, pos):
+        """ Update/rebuild the graph when the user picks a new file or searches something.
+           Stores the graph and its nodes positions in an intermediary value (div in the app).
            This little maneuver greatly improves computational time.
 
         Arguments:
-            search_value {[type]} -- [description]
-            value2 {[type]} -- [description]
-            content {[type]} -- [description]
-            filepath {[type]} -- [description]
-
-        Returns:
-            [type] -- [description]
+            content -- [The content of the uploaded file]
+            search_value -- [The value searched by the user. Single node, double nodes, paths]
+            n_clicks -- [Number of times the button was clicked]
+            filepath -- [Contains the file extension. Used to differentiate .txt from .p files]
         """
         ctx = dash.callback_context
         component_name = ctx.triggered[0]['prop_id'].split('.')[0]
