@@ -52,14 +52,16 @@ def process_file(content, file_extension):
 
     nodes = []
     edges = []
-    for row in data:
-        if len(row) > 1:
+    for d in data:
+        if len(d) > 1:
             # This string manipulation is dependent on the structure of the files
-            split = row.split("(", maxsplit=1)[1]
+            split = d.split("(", maxsplit=1)[1]
             if (split.find("(")==-1) & (split.find(",")!=-1):
                 edges.append(d)
             else:
                 nodes.append(d)
+    print(type(nodes[0]))
+    print(nodes[0])
     return nodes, edges
 
 def rreplace(string, old, new, occurrence):
@@ -126,9 +128,6 @@ def get_search_indices(search, G):
        The user can search individual nodes(1), nodes with the sK parent(2) and paths(3).
        Paths can be searched only between attributes of sK-nodes.
 
-      #TODO Refactor the Gnodes variable as it is used 3 times
-      #TODO Refactor the return line
-
     Arguments:
         search {string} -- The node/nodes
         G {Graph} -- The graph
@@ -147,7 +146,7 @@ def get_search_indices(search, G):
     try:
         search, sk = search.split(",")
 
-        # Check if a path has been searched
+        # Check if its a path
         if (search.find('sK') == -1) & (sk.find('sK') == -1):
             search1=False
             search3=True
@@ -156,7 +155,6 @@ def get_search_indices(search, G):
         search2 = True
 
     if search1:
-        # Flag to check if the node search combination was found
         found=False
 
         # Get the real value of the original node. When the graph was generated,
@@ -169,47 +167,27 @@ def get_search_indices(search, G):
                     found=True
                     break
 
-        # The nodes that will be highlighted. This includes by default the searched node
-        # and its sK parent node. Optionally, if there is an outgoing edge, the neighboring
-        # node is also highlighted
         highlighted=[]
         if found:
             # First we add all the sk nodes and then the attributes
+
             # Add parent sK node
             highlighted.append(sk)
 
-            # Add the neighboring Sk if an edge is going out
+            # Add the neighboring sK if an edge is going out
             for edge in G.edges:
                 if edge[0] == sk:
                     if edge[1].find("sK") != -1:
                         highlighted.append(edge[1])
 
             highlighted.append(search)
-
-            # Turn the list to the corresponding node indices
-            Gnodes = np.array(G.nodes)
-            highlighted=[int(np.where(Gnodes==node)[0]) for node in highlighted]
-        return highlighted, search1, search2, search3
-
     elif search2:
         highlighted = []
         for node in G.nodes:
             if node.lstrip(" ").rstrip(" ") == search:
                 highlighted.append(node)
-
-        Gnodes = np.array(G.nodes)
-        highlighted = [int(np.where(Gnodes==node)[0]) for node in highlighted]
-        return highlighted, search1, search2, search3
     elif search3:
         searchNodes = [search]
-
-        # In order to make it possible for nodes of the same name to be on the same graph, spaces
-        # have been  added to already existing nodes in the graph before they are added
-        # to this graph. (this is how the implementation was thought from day 1)
-        #
-        # We will add possible other nodes to our searchNodes array by adding such spaces. They can
-        # have spaces before, after or both in the beginning of the word. Admittedly, this solution
-        # doesn't sound clean/right
         for i in range(1, 4):
             searchNodes.append(search+" "*i)
             searchNodes.append(i*" "+search)
@@ -221,7 +199,7 @@ def get_search_indices(search, G):
             searchNodes.append(i*" "+sk)
             searchNodes.append(i*" "+sk+" "*i)
 
-        # Now filter all the nodes that really are in the graph
+        # Filter all the nodes that actually are in the graph
         searchNodes = [node for node in searchNodes if G.has_node(node)]
 
         # Find the index where the second nodes start
@@ -234,12 +212,10 @@ def get_search_indices(search, G):
         highlighted=[]
         for i in range(0, pos):
             for j in range(pos, len(searchNodes)):
-        #         print("Examining: ", searchNodes[i], " ", searchNodes[j])
                 paths = nx.all_simple_paths(G, searchNodes[i], searchNodes[j])
                 for path in paths:
                     highlighted.append(path)
 
-        # Assign the value to the global variable paths for future usage
         global node_paths
         node_paths = highlighted
 
@@ -249,16 +225,19 @@ def get_search_indices(search, G):
             highlighted = [int(np.where(Gnodes==node)[0]) for node in highlighted[0]]
         return highlighted, search1, search2, search3
 
+    Gnodes = np.array(G.nodes)
+    highlighted = [int(np.where(Gnodes==node)[0]) for node in highlighted]
+    return highlighted, search1, search2, search3
+
 def get_clicked_path(n_clicks, paths):
-    """Get the path according to the number of times the button was clicked.
-       The paths are stored in the global node_paths variable once
+    """ Get the path based on the number of times the button was clicked.
 
     Arguments:
-        n_clicks {[type]} -- [description]
-        paths {[type]} -- [description]
+        n_clicks {int} -- number of clicks
+        paths {list} -- global array storing the paths
 
     Returns:
-        [type] -- [description]
+        A single next path based on the number of clicks
     """
     if n_clicks < len(paths):
         return paths[n_clicks]
@@ -292,35 +271,18 @@ def visualize_graph(G, pos, searchValue='', highlighted=[]):
         node_labels.append(key)
 
     # By default there are only two types of color: sK and the parent
-    # if a node has been searched the color types can go up to four
     node_color = np.array([1.0 if node.find('sK')!=-1  else 0 for node in node_labels])
 
-    # String containing error messages
     errorMessage=" "
     search1=False
     search2=False
     search3=False
 
-    # another path is being searched by clicking on the button
+    # Another path is being searched by clicking on the button
     if len(highlighted) > 0:
-        # Convert node names to indices
         Gnodes = np.array(G.nodes)
-        print("Is there any search value? ", searchValue)
-        print("Highlighted: ", highlighted)
         # Get the indices
-        # highlighted=[int(np.where(Gnodes==node)[0]) for node in highlighted]
-        tmp = []
-        for node in highlighted:
-            tt1 = np.where(Gnodes==node)[0]
-            print(np.where(Gnodes==node))
-            print(tt1)
-            tt=int(np.where(Gnodes==node)[0])
-            tmp.append(tt)
-            print(tt)
-
-        highlighted = tmp
-
-        print("Indeces: ",highlighted)
+        highlighted=[int(np.where(Gnodes==node)[0]) for node in highlighted]
         for i in range(len(highlighted)):
             node_color[highlighted[i]] = 0.5
         search3 = True
@@ -337,8 +299,6 @@ def visualize_graph(G, pos, searchValue='', highlighted=[]):
             errorMessage="The searched node/path does not exist."
         else:
             if search1:
-                # First search type was performed (refer to get_search_indices docs for more info)
-                #
                 # If length is two, then there is only one sK node to highlight. This means
                 # that there was no outgoing edge from the parent sK to any neighboring sk
                 if len(highlighted) == 2:
@@ -355,10 +315,6 @@ def visualize_graph(G, pos, searchValue='', highlighted=[]):
                 # Or paths were searched
                 for i in range(len(highlighted)):
                     node_color[highlighted[i]] = 0.5
-
-    # Attempt to debug the problem with color highlight with some files
-    # print("*********** Node COLORS ***********")
-    # print(node_color)
 
     # Edges information for edge trace
     edge_x = []
@@ -393,7 +349,6 @@ def visualize_graph(G, pos, searchValue='', highlighted=[]):
         node_trace = go.Scatter( x=node_x, y=node_y, text=node_labels, textposition='bottom center',
                         mode='markers+text', hoverinfo='text', name='Nodes',
                         marker=dict( showscale=False,
-        #                 symbol='circle',
                         color=node_color,
                         # 0.3 -> red; 0.5->blue
                         colorscale = [[0, 'rgba(41, 128, 185, 0.2)'], [0.3, 'rgba(192, 57, 43, 1)'],
@@ -406,7 +361,6 @@ def visualize_graph(G, pos, searchValue='', highlighted=[]):
         node_trace = go.Scatter( x=node_x, y=node_y, text=node_labels, textposition='bottom center',
                         mode='markers+text', hoverinfo='text', name='Nodes',
                         marker=dict( showscale=False,
-        #                 symbol='circle',
                         color=node_color,
                         colorscale = [[0, 'rgba(41, 128, 185, 0.4)'], [0.5, 'rgba(0, 255, 0, 1)'],
                                      [1.0, 'rgba(192, 57, 43, 0.4)']],
@@ -418,7 +372,6 @@ def visualize_graph(G, pos, searchValue='', highlighted=[]):
         node_trace = go.Scatter( x=node_x, y=node_y, text=node_labels, textposition='bottom center',
                         mode='markers+text', hoverinfo='text', name='Nodes',
                         marker=dict( showscale=False,
-        #                 symbol='circle',
                         color=node_color,
                         colorscale = [[0, 'rgba(41, 128, 185, 1)'], [1, 'rgba(192, 57, 43, 1)']],
                         size=15,
@@ -463,7 +416,6 @@ def visualize_graph(G, pos, searchValue='', highlighted=[]):
                 xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                 yaxis=dict(showgrid=False, zeroline=False, showticklabels=False)
     )
-
     fig = go.Figure(data=data, layout=layout)
     return fig, errorMessage
 
@@ -471,8 +423,7 @@ def visualize_graph(G, pos, searchValue='', highlighted=[]):
 
 
 if __name__ == '__main__':
-
-    # Initialize the graph with no data
+     # Initialize the graph with no data
     fig = go.Figure(data=None, layout = go.Layout(
                 width = 1000,
                 height = 600,
@@ -485,14 +436,13 @@ if __name__ == '__main__':
                 yaxis=dict(showgrid=False, zeroline=False, showticklabels=False)
     ))
 
-    # Define app layout
     app.layout = html.Div([
         ### Title
         html.Div([html.H1("First-order Logic Network Graph")],
                 className="row",
                 style={'textAlign': "center"}),
 
-        ### Define the components, row
+        ### Define the components
         html.Div(
             className="row",
             children=[
@@ -564,13 +514,13 @@ if __name__ == '__main__':
         dash.dependencies.Input('input', 'value'),
         dash.dependencies.Input('next-path-btn', 'n_clicks'),],
 
-        [dash.dependencies.State('upload-data', 'filename'),
+        [dash.dependencies.State(component_id='upload-data', component_property='filename'),
         dash.dependencies.State('graph-intermediary', 'children'),
         dash.dependencies.State('graph-pos-intermediary', 'children'),]
     )
     def process_graph(content, search_value, n_clicks, filepath,  G, pos):
         """ Update/rebuild the graph when the user picks a new file or searches something.
-           Stores the graph and its nodes positions in an intermediary value (div in the app).
+           Stores the graph and its nodes positions in an intermediary div.
            This little maneuver greatly improves computational time.
 
         Arguments:
@@ -605,17 +555,17 @@ if __name__ == '__main__':
 
             if component_name == 'input':
                 graph, error = visualize_graph(G, pos, search_value)
-                print("NOde paths length: ", len(node_paths))
                 if len(node_paths) > 1:
-                    return graph, json.dumps(json_graph.node_link_data(G)), json.dumps(pos), {'display': 'block'}, error
-                return graph, json.dumps(json_graph.node_link_data(G)), json.dumps(pos), {'display': 'none'}, error
-            elif (component_name == 'next-path-btn') & (component_value > 0):
+                    button_display = {'display': 'block'}
+                else:
+                    button_display = {'display':'none'}
+                return graph, json.dumps(json_graph.node_link_data(G)), json.dumps(pos), button_display, error
+            elif (component_name == 'next-path-btn'):
                 if n_clicks > 0:
                     # Display other paths
                     highlighted = get_clicked_path(n_clicks, node_paths)
                     graph, error = visualize_graph(G, pos, '', highlighted)
                     return graph, json.dumps(json_graph.node_link_data(G)), json.dumps(pos), {'display': 'block'}, error
 
-    ###### Start server
     app.run_server(debug=True, use_reloader=False)
     # app.run_server(debug=True,dev_tools_ui=False,dev_tools_props_check=False)
