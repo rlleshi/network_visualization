@@ -60,8 +60,6 @@ def process_file(content, file_extension):
                 edges.append(d)
             else:
                 nodes.append(d)
-    print(type(nodes[0]))
-    print(nodes[0])
     return nodes, edges
 
 def rreplace(string, old, new, occurrence):
@@ -150,9 +148,12 @@ def get_search_indices(search, G):
         if (search.find('sK') == -1) & (sk.find('sK') == -1):
             search1=False
             search3=True
+        search = search.strip()
+        sk = sk.strip()
     except ValueError:
         search1 = False
         search2 = True
+        search = search.strip()
 
     if search1:
         found=False
@@ -162,7 +163,7 @@ def get_search_indices(search, G):
         # more than once and a node name must be unique
         for node in G.nodes:
             if len(G.nodes[node].items()) > 0:
-                if (G.nodes[node]['sk'] == sk) & (node.lstrip(" ").rstrip(" ")==search):
+                if (G.nodes[node]['sk'] == sk) & (node==search):
                     search=node
                     found=True
                     break
