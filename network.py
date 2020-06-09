@@ -1,8 +1,8 @@
 import sys
 import random
-import numpy as np
 import base64
 import io
+import numpy as np
 import networkx as nx
 from networkx.readwrite import json_graph
 import json
@@ -22,62 +22,55 @@ from dash.exceptions import PreventUpdate
 # Docs on Plotly: https://plotly.com/python/network-graphs/
 ##################################################################################################################################
 
-
-# import the css template, and pass the css template into dash
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 app.title = "FOL Network"
 
-# Global variable that will save the paths that are searched for
-# If this app will be used by multiple ppl at the same time, this should not be a global variable
+# Global variable for storing paths
+# If the app will be used by multiple people, then the paths should not be saved in a global var
 node_paths=[]
 # Its very important to have a seed for graph stability considering the implementation
 random.seed(3)
 
 def process_file(content, file_extension):
-    """ Process the text file containing the graph and return its nodes and edges.
+    """ Process the file containing the graph and return its nodes and edges.
         Only processes .txt and .p files.
 
     Arguments:
-        file {string} -- The text file
+        file {string} -- The file
+        file_extension {string} -- Type of file. Either .txt or .p
 
     Returns:
-        list -- A list of nodes and edges of the graph
+        list -- Two lists, nodes and edges of the graph
     """
-    # Read the data -according to the file ending-, clean and split into an array
-    if file_extension=='txt':
-        data= [el.strip() for el in content.split(".")]
-    elif file_extension=='p':
+    if file_extension == 'txt':
+        data = [el.strip() for el in content.split(".")]
+    elif file_extension == 'p':
         data = [el.strip() for el in content.split(":")[1].split("%")[0].split(".")]
     else:
         data=[]
 
     nodes = []
     edges = []
-    for d in data:
-        if len(d) > 1:
-
-            # String manipulation in order to find out if we have a node or edge
-            # This is strictly dependend on the structure of the files encountered so far
-            # and specifically takes care to include hyperoutput2.txt file which has a
-            # different structure from the other files
-            split = d.split("(", maxsplit=1)[1]
+    for row in data:
+        if len(row) > 1:
+            # This string manipulation is dependent on the structure of the files
+            split = row.split("(", maxsplit=1)[1]
             if (split.find("(")==-1) & (split.find(",")!=-1):
                 edges.append(d)
             else:
                 nodes.append(d)
-
     return nodes, edges
 
 def rreplace(string, old, new, occurrence):
-    """ Replace function constructed to replace the last occurrences of a string.
-        Python's inbuild function only works starting from the beginning and not the end.
+    """ Replace the last occurrences of a string.
+        Python's build in function only works starting from the beginning and not the end.
     """
     li = string.rsplit(old, occurrence)
     return new.join(li)
 
 def build_graph(nodes, edges):
-    """Build a graph given its nodes and its edges.
+    """ Build a graph given its nodes and edges.
 
    Arguments:
        nodes {list} -- The nodes of the graph
@@ -87,6 +80,7 @@ def build_graph(nodes, edges):
        DiGraph -- A directed graph representing the network
    """
     G = nx.DiGraph()
+
     # Add SK nodes
     [G.add_node(rreplace(node.split("(", maxsplit=1)[1], ")", "", 1)) for node in nodes]
 
@@ -105,15 +99,14 @@ def build_graph(nodes, edges):
                 n = " "+n
             else:
                 n = n + " "
-
         G.add_node(n)
 
         # Add the parent SK as a label
         G.nodes[n]['sk']=sk
 
-        # Add edge with the corresponding SK
+        # Add an edge with the parent sK
         G.add_edge(n, sk)
-        G.add_edge(sk,n)
+        G.add_edge(sk, n)
 
 
     # Add edges for SK
@@ -129,17 +122,16 @@ def build_graph(nodes, edges):
     return G
 
 def get_search_indices(search, G):
-    """Get the search indices of the searched nodes.
-       The user can search individual nodes, nodes with the sK parent and paths.
-       Paths can be searched only between attributes of nodes.
-       This method will return the corresponding indices for the nodes.
+    """Get the indices of the searched nodes. There can be three kinds of search.
+       The user can search individual nodes(1), nodes with the sK parent(2) and paths(3).
+       Paths can be searched only between attributes of sK-nodes.
 
       #TODO Refactor the Gnodes variable as it is used 3 times
       #TODO Refactor the return line
 
     Arguments:
-        search {string} -- The node, nodes to be searched
-        G {Graph} -- The graph where the node will be searched
+        search {string} -- The node/nodes
+        G {Graph} -- The graph
 
     Returns:
         list -- A list of indices of the searched nodes
