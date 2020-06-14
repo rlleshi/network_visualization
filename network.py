@@ -249,17 +249,6 @@ def get_clicked_path(n_clicks, paths):
 
 #TODO Method documentation
 def visualize_graph(G, pos, searchValue='', highlighted=[]):
-
-    # # Parse nodes and edges
-    # nodes, edges = process_file(content, file_extension)
-    # # Build graph
-    # G = build_graph(nodes, edges)
-
-    # ########## Visualize the graph
-
-    # # Set node positions
-    # pos = nx.nx_pydot.graphviz_layout(G)
-
     # Nodes information
     node_x = []
     node_y = []
