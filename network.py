@@ -406,7 +406,7 @@ def visualize_graph(G, pos, searchValue='', highlighted=[]):
 
     # Finally, create layout
     layout = go.Layout(
-                width = 1000,
+                width = 1250,
                 height = 600,
                 showlegend=False,
                 plot_bgcolor="rgb(255, 255, 250)",
@@ -426,7 +426,7 @@ def visualize_graph(G, pos, searchValue='', highlighted=[]):
 if __name__ == '__main__':
      # Initialize the graph with no data
     fig = go.Figure(data=None, layout = go.Layout(
-                width = 1000,
+                width = 1250,
                 height = 600,
                 showlegend=False,
                 plot_bgcolor="rgb(255, 255, 250)",
@@ -448,7 +448,7 @@ if __name__ == '__main__':
             className="row",
             children=[
 
-            ### Upload component
+            ### Top Upload component
                 html.Div(
                     dcc.Upload(
                         id='upload-data',
@@ -470,9 +470,28 @@ if __name__ == '__main__':
                 style={'text-align': 'center',}
                 ),
 
+            ### Top components (below upload)
+            html.Div(
+                children=[
+                    html.Div(
+                        children=[
+                            dcc.Markdown(d("""
+                            **Search Node(s)/Paths**
+                            """)),
+                            dcc.Input(id='input', type='text', placeholder='node/paths', value='',
+                                    debounce=True)],
+                        style={'width':'50%', 'display':'inline-block'},
+                    ),
+                    ### Button for graph paths
+                    html.Div(
+                        html.Button('Next Path', id='next-path-btn', n_clicks=0, hidden=True),
+                        style={'width':'50%', 'display':'inline-block'}),
+                    html.Div(id="error"),
+                ],
+            ),
+
             ### Middle graph component
                 html.Div(
-                    className="eight columns",
                     children=[
                         dcc.Graph(id='fol-graph', figure=fig),
                         # Store the graph and more importantly node positions here between callbacks
@@ -481,24 +500,6 @@ if __name__ == '__main__':
                         ]
                 ),
 
-            ### Left side components
-                html.Div(
-                    className='two columns',
-                    children=[
-                        dcc.Markdown(d("""
-                        **Search Node **
-
-                        Search for individual nodes, connecting nodes or paths.
-                        """)),
-                        dcc.Input(id='input', type='text', placeholder='node/paths', value='',
-                                debounce=True),
-                        html.Div(id="error", style={'margin-top': '100px'}),
-
-                        ### Button for graph paths
-                        html.Button('Next Path', id='next-path-btn', n_clicks=0, hidden=True,),
-                    ],
-                    style={'margin-left': '200px', 'height': '300px'}
-                ),
             ]
         )
     ])
