@@ -430,7 +430,8 @@ if __name__ == '__main__':
         ### Title
         html.Div([html.H1("First-order Logic Network Graph")],
                 className="row",
-                style={'textAlign': "center"}),
+                style={'textAlign': "center"}
+        ),
 
         ### Define the components
         html.Div(
@@ -438,43 +439,60 @@ if __name__ == '__main__':
             children=[
 
             ### Top Upload component
-                html.Div(
-                    dcc.Upload(
-                        id='upload-data',
-                        children=html.Div([
-                            'Drag and Drop or ',
-                            html.A('Select Files')
-                        ]),
-                        style={
-                            'display': 'inline-block',
-                            'width': '25%',
-                            'height': '60px',
-                            'lineHeight': '60px',
-                            'borderWidth': '1px',
-                            'borderStyle': 'dashed',
-                            'borderRadius': '5px',
-                            'textAlign': 'center',
-                        },
-                    ),
-                style={'text-align': 'center',}
+            html.Div(
+                dcc.Upload(
+                    id='upload-data',
+                    children=html.Div([
+                        'Drag and Drop or ',
+                        html.A('Select Files')
+                    ]),
+                    style={
+                        'display': 'inline-block',
+                        'width': '30%',
+                        'height': '80px',
+                        'lineHeight': '80px',
+                        'borderWidth': '1px',
+                        'borderStyle': 'dashed',
+                        'borderRadius': '5px',
+                        'textAlign': 'center',
+                    },
                 ),
+                style={'text-align': 'center', 'margin-bottom':'10px'}
+            ),
 
             ### Top components (below upload)
             html.Div(
                 children=[
                     html.Div(
                         children=[
-                            dcc.Markdown(d("""
-                            **Search Node(s)/Paths**
-                            """)),
+                            dcc.Dropdown(
+                                id='search_dropdown',
+                                options=[
+                                    {'label':'node-sk', 'value': 'node,sKx'},
+                                    {'label':'single node', 'value': 'node'},
+                                    {'label':'paths', 'value':'node1,node2'}
+                                ],
+                                value='node,sKx',
+                                placeholder='Select a search mode',
+                                style={'margin-top':'-37px'}
+                            ),
+                            dcc.Markdown("**Select search mode**")
+                        ],
+                        style={'width':'25%', 'display':'inline-block'},
+                    ),
+                    html.Div(
+                        children=[
                             dcc.Input(id='input', type='text', placeholder='node/paths', value='',
-                                    debounce=True)],
-                        style={'width':'50%', 'display':'inline-block'},
+                                    debounce=True),
+                            dcc.Markdown("**Search Node(s)/Paths**")
+                        ],
+                        style={'width':'45%', 'display':'inline-block'},
                     ),
                     ### Button for graph paths
                     html.Div(
                         html.Button('Next Path', id='next-path-btn', n_clicks=0, hidden=True),
-                        style={'width':'50%', 'display':'inline-block'}),
+                        style={'width':'30%', 'display':'inline-block'}
+                    ),
                     html.Div(id="error"),
                 ],
             ),
@@ -488,7 +506,6 @@ if __name__ == '__main__':
                         html.Div(id='graph-intermediary', style={'display':'none'}),
                         ]
                 ),
-
             ]
         )
     ])
@@ -558,5 +575,5 @@ if __name__ == '__main__':
                     graph, error = visualize_graph(G, pos, '', highlighted)
                     return graph, json.dumps(json_graph.node_link_data(G)), json.dumps(pos), {'display': 'block'}, error
 
-    app.run_server(debug=True, use_reloader=False)
+    app.run_server(debug=True, use_reloader=False,dev_tools_hot_reload=True)
     # app.run_server(debug=True,dev_tools_ui=False,dev_tools_props_check=False)
