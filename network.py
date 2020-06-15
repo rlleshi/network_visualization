@@ -121,7 +121,7 @@ def build_graph(nodes, edges):
                         G.add_edge(node, node2, Label = edge.split("(")[0])
     return G
 
-def get_search_indices(search, G):
+def get_search_indices(search, search_type, G):
     """Get the indices of the searched nodes. There can be three kinds of search.
        The user can search individual nodes(1), nodes with the sK parent(2) and paths(3).
        Paths can be searched only between attributes of sK-nodes.
@@ -136,24 +136,25 @@ def get_search_indices(search, G):
         search2 -- Second type of search, only a node
         search3 -- Third type of search, paths
     """
-
-    search1 = True
+    highlighted = []
+    search1 = False
     search2 = False
     search3 = False
 
+    if search_type == 'node,sKx':
+        search1=True
+    elif search_type == 'node':
+        search2=True
+    elif search_type == 'node1,node2':
+        search3=True
+
     try:
         search, sk = search.split(",")
-
-        # Check if its a path
-        if (search.find('sK') == -1) & (sk.find('sK') == -1):
-            search1=False
-            search3=True
         search = search.strip()
         sk = sk.strip()
     except ValueError:
-        search1 = False
-        search2 = True
         search = search.strip()
+        search1 = search3 = False
 
     if search1:
         found=False
@@ -168,7 +169,6 @@ def get_search_indices(search, G):
                     found=True
                     break
 
-        highlighted=[]
         if found:
             # First we add all the sk nodes and then the attributes
 
@@ -183,7 +183,6 @@ def get_search_indices(search, G):
 
             highlighted.append(search)
     elif search2:
-        highlighted = []
         for node in G.nodes:
             if node.lstrip(" ").rstrip(" ") == search:
                 highlighted.append(node)
@@ -210,7 +209,6 @@ def get_search_indices(search, G):
                 pos = i
 
         # Finally, get the paths
-        highlighted=[]
         for i in range(0, pos):
             for j in range(pos, len(searchNodes)):
                 paths = nx.all_simple_paths(G, searchNodes[i], searchNodes[j])
@@ -248,7 +246,7 @@ def get_clicked_path(n_clicks, paths):
         return paths[round(n_clicks)]
 
 #TODO Method documentation
-def visualize_graph(G, pos, searchValue='', highlighted=[]):
+def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
     # Nodes information
     node_x = []
     node_y = []
@@ -283,10 +281,10 @@ def visualize_graph(G, pos, searchValue='', highlighted=[]):
         global node_paths
         node_paths=[]
 
-        highlighted, search1, search2, search3 = get_search_indices(searchValue, G)
+        highlighted, search1, search2, search3 = get_search_indices(searchValue, search_type, G)
 
         if len(highlighted)==0:
-            errorMessage="The searched node/path does not exist."
+            errorMessage="The searched node/path does not exist. Make sure the input format is correct."
         else:
             if search1:
                 # If length is two, then there is only one sK node to highlight. This means
@@ -510,6 +508,17 @@ if __name__ == '__main__':
         )
     ])
 
+
+    @app.callback(
+        [dash.dependencies.Output(component_id='input', component_property='placeholder'),
+        dash.dependencies.Output('input', 'value')],
+        [dash.dependencies.Input(component_id='search_dropdown', component_property='value'),]
+        )
+    def update_mode_search(mode):
+        """Update the placeholder of the search box based on the drop-down options
+        """
+        return mode, ""
+
     ###### Callback for all components
     @app.callback(
         [dash.dependencies.Output(component_id='fol-graph', component_property='figure'),
@@ -520,13 +529,14 @@ if __name__ == '__main__':
 
         [dash.dependencies.Input(component_id='upload-data', component_property='contents'),
         dash.dependencies.Input('input', 'value'),
-        dash.dependencies.Input('next-path-btn', 'n_clicks'),],
+        dash.dependencies.Input('next-path-btn', 'n_clicks'),
+        dash.dependencies.Input(component_id='search_dropdown', component_property='value')],
 
         [dash.dependencies.State(component_id='upload-data', component_property='filename'),
         dash.dependencies.State('graph-intermediary', 'children'),
         dash.dependencies.State('graph-pos-intermediary', 'children'),]
     )
-    def process_graph(content, search_value, n_clicks, filepath,  G, pos):
+    def process_graph(content, search_value, n_clicks, search_type, filepath,  G, pos):
         """ Update/rebuild the graph when the user picks a new file or searches something.
            Stores the graph and its nodes positions in an intermediary div.
            This little maneuver greatly improves computational time.
@@ -557,12 +567,15 @@ if __name__ == '__main__':
             return graph, json.dumps(json_graph.node_link_data(G)), json.dumps(pos), {'display': 'none'}, ''
 
         else:
-            G = json_graph.node_link_graph(json.loads(G))
-            pos = json.loads(pos)
+            try:
+                G = json_graph.node_link_graph(json.loads(G))
+                pos = json.loads(pos)
+            except TypeError:
+                raise PreventUpdate
             global node_paths
 
             if component_name == 'input':
-                graph, error = visualize_graph(G, pos, search_value)
+                graph, error = visualize_graph(G, pos, search_value, search_type)
                 if len(node_paths) > 1:
                     button_display = {'display': 'block'}
                 else:
@@ -572,8 +585,10 @@ if __name__ == '__main__':
                 if n_clicks > 0:
                     # Display other paths
                     highlighted = get_clicked_path(n_clicks, node_paths)
-                    graph, error = visualize_graph(G, pos, '', highlighted)
+                    graph, error = visualize_graph(G, pos, '', '', highlighted)
                     return graph, json.dumps(json_graph.node_link_data(G)), json.dumps(pos), {'display': 'block'}, error
+            else:
+                raise PreventUpdate
 
     app.run_server(debug=True, use_reloader=False,dev_tools_hot_reload=True)
     # app.run_server(debug=True,dev_tools_ui=False,dev_tools_props_check=False)
