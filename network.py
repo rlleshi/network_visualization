@@ -164,7 +164,7 @@ def get_search_indices(search, search_type, G):
         # more than once and a node name must be unique
         for node in G.nodes:
             if len(G.nodes[node].items()) > 0:
-                if (G.nodes[node]['sk'] == sk) & (node==search):
+                if (G.nodes[node]['sk'] == sk) & (node.strip()==search):
                     search=node
                     found=True
                     break
