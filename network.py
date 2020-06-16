@@ -79,7 +79,8 @@ def build_graph(nodes, edges):
    Returns:
        DiGraph -- A directed graph representing the network
    """
-    G = nx.DiGraph()
+    # G = nx.DiGraph()
+    G = nx.Graph()
 
     # Add SK nodes
     [G.add_node(rreplace(node.split("(", maxsplit=1)[1], ")", "", 1)) for node in nodes]
@@ -106,19 +107,13 @@ def build_graph(nodes, edges):
 
         # Add an edge with the parent sK
         G.add_edge(n, sk)
-        G.add_edge(sk, n)
 
 
     # Add edges for SK
     for edge in edges:
         first, second = edge.split("(",maxsplit=1)[1].split(",")
         second = second.replace(")", "", 1).strip()
-
-        for node in G.nodes():
-            if node == first:
-                for node2 in G.nodes():
-                    if node2 == second:
-                        G.add_edge(node, node2, Label = edge.split("(")[0])
+        G.add_edge(first,second)
     return G
 
 def get_search_indices(search, search_type, G):
@@ -175,11 +170,14 @@ def get_search_indices(search, search_type, G):
             # Add parent sK node
             highlighted.append(sk)
 
-            # Add the neighboring sK if an edge is going out
+            # Add the neighboring sK
             for edge in G.edges:
                 if edge[0] == sk:
                     if edge[1].find("sK") != -1:
                         highlighted.append(edge[1])
+                elif edge[1] == sk:
+                    if edge[0].find("sK") != -1:
+                        highlighted.append(edge[0])
 
             highlighted.append(search)
     elif search2:
