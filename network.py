@@ -491,7 +491,7 @@ if __name__ == '__main__':
                         html.Button('Next Path', id='next-path-btn', n_clicks=0, hidden=True),
                         style={'width':'30%', 'display':'inline-block'}
                     ),
-                    html.Div(id="error"),
+                    html.Div(id="error", style={'color':'red'}),
                 ],
             ),
 
