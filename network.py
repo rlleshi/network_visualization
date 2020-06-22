@@ -285,20 +285,13 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
             errorMessage="The searched node/path does not exist. Make sure the input format is correct."
         else:
             if search1:
-                # If length is two, then there is only one sK node to highlight. This means
-                # that there was no outgoing edge from the parent sK to any neighboring sk
-                if len(highlighted) == 2:
-                    node_color[highlighted[0]] = 0.3
-                    node_color[highlighted[1]] = 0.5
-                else:
-                    for i in range(len(highlighted)):
-                        if i<len(highlighted)-1:
-                            node_color[highlighted[i]] = 0.3
-                        else:
-                            node_color[highlighted[i]] = 0.5
+                for i in range(len(highlighted)):
+                    if i<len(highlighted)-1:
+                        node_color[highlighted[i]] = 0.3
+                    else:
+                        node_color[highlighted[i]] = 0.5
             elif (search2) | (search3):
-                # A node was searched irrespective of sK
-                # Or paths were searched
+                # Singular node or a path was searched
                 for i in range(len(highlighted)):
                     node_color[highlighted[i]] = 0.5
 
@@ -330,40 +323,24 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
         else:
             edge_labels.append((None, None, None))
 
-    if (len(highlighted)>0) & (search1==True):
-        # create node trace with multiple colors according to the highlighted nodes (including sk)
-        node_trace = go.Scatter( x=node_x, y=node_y, text=node_labels, textposition='bottom center',
-                        mode='markers+text', hoverinfo='text', name='Nodes',
-                        marker=dict( showscale=False,
-                        color=node_color,
-                        # 0.3 -> red; 0.5->blue
-                        colorscale = [[0, 'rgba(41, 128, 185, 0.2)'], [0.3, 'rgba(192, 57, 43, 1)'],
-                                    [0.5, 'rgba(41, 128, 185, 1)'],  [1.0, 'rgba(192, 57, 43, 0.2)']],
-                        size=15,
-                        line=dict(color='rgb(180,255,255)', width=1))
-                            )
-    elif (len(highlighted)>0) & ((search2==True) | (search3==True)):
-        # create node trace with multiple colors according to the highlighted nodes (excluding sk)
-        node_trace = go.Scatter( x=node_x, y=node_y, text=node_labels, textposition='bottom center',
-                        mode='markers+text', hoverinfo='text', name='Nodes',
-                        marker=dict( showscale=False,
-                        color=node_color,
-                        colorscale = [[0, 'rgba(41, 128, 185, 0.4)'], [0.5, 'rgba(0, 255, 0, 1)'],
-                                     [1.0, 'rgba(192, 57, 43, 0.4)']],
-                        size=15,
-                        line=dict(color='rgb(180,255,255)', width=1))
-                           )
+    # Colorscale corresponding to colors
+    if (len(highlighted)>0) & (search1):
+        colorscale = [[0, 'rgba(41, 128, 185, 0.2)'], [0.3, 'rgba(192, 57, 43, 1)'],
+                    [0.5, 'rgba(41, 128, 185, 1)'],  [1.0, 'rgba(192, 57, 43, 0.2)']]
+    elif (len(highlighted)>0) & ((search2) | (search3)):
+        colorscale = [[0, 'rgba(41, 128, 185, 0.4)'], [0.5, 'rgba(0, 255, 0, 1)'],
+                    [1.0, 'rgba(192, 57, 43, 0.4)']]
     else:
-        # create node trace without color highlight
-        node_trace = go.Scatter( x=node_x, y=node_y, text=node_labels, textposition='bottom center',
-                        mode='markers+text', hoverinfo='text', name='Nodes',
-                        marker=dict( showscale=False,
-                        color=node_color,
-                        colorscale = [[0, 'rgba(41, 128, 185, 1)'], [1, 'rgba(192, 57, 43, 1)']],
-                        size=15,
-                        line=dict(color='rgb(180,255,255)', width=1))
-                            )
+        colorscale = [[0, 'rgba(41, 128, 185, 1)'], [1, 'rgba(192, 57, 43, 1)']]
 
+    node_trace = go.Scatter( x=node_x, y=node_y, text=node_labels, textposition='bottom center',
+                    mode='markers+text', hoverinfo='text', name='Nodes',
+                    marker=dict( showscale=False,
+                    color=node_color,
+                    colorscale = colorscale,
+                    size=15,
+                    line=dict(color='rgb(180,255,255)', width=1))
+                )
 
     # create edge trace
     edge_trace = go.Scatter( x=edge_x, y=edge_y,
@@ -497,7 +474,7 @@ if __name__ == '__main__':
                 html.Div(
                     children=[
                         dcc.Graph(id='fol-graph', figure=fig),
-                        # Store the graph and more importantly node positions here between callbacks
+                        # Store the graph node positions here between callbacks
                         html.Div(id='graph-pos-intermediary', style={'display':'none'}),
                         html.Div(id='graph-intermediary', style={'display':'none'}),
                         ]
