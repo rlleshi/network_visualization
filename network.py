@@ -113,7 +113,7 @@ def build_graph(nodes, edges):
     for edge in edges:
         first, second = edge.split("(",maxsplit=1)[1].split(",")
         second = second.replace(")", "", 1).strip()
-        G.add_edge(first,second)
+        G.add_edge(first,second,Label=edge.split("(")[0])
     return G
 
 def get_search_indices(search, search_type, G):
@@ -256,7 +256,8 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
         node_y.append(y)
         node_labels.append(key)
 
-    # By default there are only two types of color: sK and the parent
+    # This array will be used with a colorscale in order to define the color of the node
+    # This array will contain the indices. The colorscale will map them to the color.
     node_color = np.array([1.0 if node.find('sK')!=-1  else 0 for node in node_labels])
 
     errorMessage=" "
@@ -313,15 +314,15 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
         # Get the edge label
         label = [val for val in edge[2].values()]
 
-        # Create the middle line coordinates where we shall add the name of the edge
+        # Create the middle line coordinates where we shall add the label of the edge
         ax = (x0+x1)/2
         ay = (y0+y1)/2
 
         # Not all edges have a label
         if len(label) > 0:
             edge_labels.append((label[0], ax, ay))
-        else:
-            edge_labels.append((None, None, None))
+        # else:
+        #     edge_labels.append((None, None, None))
 
     # Colorscale corresponding to colors
     if (len(highlighted)>0) & (search1):
@@ -335,11 +336,13 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
 
     node_trace = go.Scatter( x=node_x, y=node_y, text=node_labels, textposition='bottom center',
                     mode='markers+text', hoverinfo='text', name='Nodes',
-                    marker=dict( showscale=False,
-                    color=node_color,
-                    colorscale = colorscale,
-                    size=15,
-                    line=dict(color='rgb(180,255,255)', width=1))
+                    marker=dict(
+                        showscale=False,
+                        color=node_color,
+                        colorscale=colorscale,
+                        size=15,
+                        line=dict(color='rgb(180,255,255)', width=1)
+                    )
                 )
 
     # create edge trace
