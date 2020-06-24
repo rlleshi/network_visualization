@@ -20,6 +20,7 @@ from dash.exceptions import PreventUpdate
 # Docs on Dash Plotly: https://dash.plotly.com/
 #
 # Docs on Plotly: https://plotly.com/python/network-graphs/
+#                 https://plotly.com/python/reference/
 ##################################################################################################################################
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
@@ -116,6 +117,7 @@ def build_graph(nodes, edges):
         G.add_edge(first,second,Label=edge.split("(")[0])
     return G
 
+# TODO: See if you can factor and make the code more succint
 def get_search_indices(search, search_type, G):
     """Get the indices of the searched nodes. There can be three kinds of search.
        The user can search individual nodes(1), nodes with the sK parent(2) and paths(3).
@@ -143,8 +145,10 @@ def get_search_indices(search, search_type, G):
     elif search_type == 'node1,node2':
         search3=True
 
+    # Maybe use partition() and therefore remove try/catch?
+    # Or it makes sense since we do error check?
     try:
-        search, sk = search.split(",")
+        search, sk = search.split(",", 1)
         search = search.strip()
         sk = sk.strip()
     except ValueError:
@@ -180,10 +184,23 @@ def get_search_indices(search, search_type, G):
                         highlighted.append(edge[0])
 
             highlighted.append(search)
+
     elif search2:
         for node in G.nodes:
             if node.lstrip(" ").rstrip(" ") == search:
                 highlighted.append(node)
+
+        # If the user searched more than one node
+        if 'sk' in locals():
+            print("inside SK")
+            while len(sk)>0:
+                otherNodes = sk.partition(',')
+                currentNode = otherNodes[0].strip()
+                for node in G.nodes:
+                    if node.lstrip(" ").rstrip(" ") == currentNode:
+                        highlighted.append(node)
+                sk = otherNodes[2]
+
     elif search3:
         searchNodes = [search]
         for i in range(1, 4):
@@ -324,6 +341,10 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
         # else:
         #     edge_labels.append((None, None, None))
 
+    # print(len(edge_labels))
+    # print(len(G.edges().data()))
+    edge_color = np.array([1.0 if i>10 else 0 for i in range(len(G.edges().data()))])
+
     # Colorscale corresponding to colors
     if (len(highlighted)>0) & (search1):
         colorscale = [[0, 'rgba(41, 128, 185, 0.2)'], [0.3, 'rgba(192, 57, 43, 1)'],
@@ -345,20 +366,33 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
                     )
                 )
 
-    # create edge trace
-    edge_trace = go.Scatter( x=edge_x, y=edge_y,
-        mode = 'lines', line=dict(width=1, color='rgb(90, 90, 90)'),
-        hoverinfo='none'
+    edge_colorscale=[[0, 'rgb(0,255,0)'], [1, 'rgb(0, 0, 90)']]
+    # edge_colorscale=[[1, 'rgba(0, 0, 90, 0.5)']]
+
+    # print("Edge color", edge_color)
+    # print("Node color", node_color)
+
+    # print("Edge color scale", edge_colorscale)
+    # print("Node color scale",colorscale)
+
+    edge_trace = go.Scatter( x=edge_x, y=edge_y, mode = 'lines',
+        line=dict(width=1), hoverinfo='none',
+        marker=dict(
+            color=edge_color,
+            colorscale=edge_colorscale,
+            # cmin=0,
+            # cmax=1
+        )
     )
 
     # Annotations in order to add labels for the edges
     annotations_list = [
         dict(
-            x = None if label[0] == None else label[1],
-            y = None if label[0] == None else label[2],
+            x = label[1],
+            y = label[2],
             xref = 'x',
             yref = 'y',
-            text = "" if label[0] == None else label[0],
+            text = label[0],
             showarrow=False,
             opacity=0.7,
             ax = label[1],
@@ -371,19 +405,18 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
 
     # Finally, create layout
     layout = go.Layout(
-                width = 1250,
-                height = 600,
-                showlegend=False,
-                plot_bgcolor="rgb(255, 255, 250)",
-                hovermode='closest',
-                #clickmode='event+select',
-                margin=dict(b=20,l=5,r=5,t=40),
-                annotations=annotations_list,
-                xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False)
+        width = 1250,
+        height = 600,
+        showlegend=False,
+        plot_bgcolor="rgb(255, 255, 250)",
+        hovermode='closest',
+        #clickmode='event+select',
+        margin=dict(b=20,l=5,r=5,t=40),
+        annotations=annotations_list,
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False)
     )
-    fig = go.Figure(data=data, layout=layout)
-    return fig, errorMessage
+    return go.Figure(data=data, layout=layout), errorMessage
 
 ##################################################################################################################################
 
