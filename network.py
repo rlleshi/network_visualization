@@ -192,7 +192,6 @@ def get_search_indices(search, search_type, G):
 
         # If the user searched more than one node
         if 'sk' in locals():
-            print("inside SK")
             while len(sk)>0:
                 otherNodes = sk.partition(',')
                 currentNode = otherNodes[0].strip()
@@ -341,11 +340,13 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
         # else:
         #     edge_labels.append((None, None, None))
 
-    # print(len(edge_labels))
-    # print(len(G.edges().data()))
-    edge_color = np.array([1.0 if i>10 else 0 for i in range(len(G.edges().data()))])
+    edge_color = np.array([0 for i in range(len(edge_x))])
+    print('edge_x', len(edge_x))
+    print('#edges', len(G.edges().data()))
+    print('label edges', len(edge_labels))
+    print("Edge_color", len(edge_color))
 
-    # Colorscale corresponding to colors
+    # Colorscale corresponding to colors for nodes
     if (len(highlighted)>0) & (search1):
         colorscale = [[0, 'rgba(41, 128, 185, 0.2)'], [0.3, 'rgba(192, 57, 43, 1)'],
                     [0.5, 'rgba(41, 128, 185, 1)'],  [1.0, 'rgba(192, 57, 43, 0.2)']]
@@ -365,23 +366,22 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
                         line=dict(color='rgb(180,255,255)', width=1)
                     )
                 )
+    print('node_x', len(node_x))
+    print('#nodes', len(G.nodes().data()))
+    print('label nodes', len(node_labels))
+    print("Node_color", len(node_color))
 
-    edge_colorscale=[[0, 'rgb(0,255,0)'], [1, 'rgb(0, 0, 90)']]
-    # edge_colorscale=[[1, 'rgba(0, 0, 90, 0.5)']]
+    # edge_colorscale=[[0, 'rgb(0,255,0)'], [1, 'rgb(0, 0, 90)']]
+    edge_colorscale=[[0, 'rgb(0, 255, 0)']]
 
-    # print("Edge color", edge_color)
-    # print("Node color", node_color)
-
-    # print("Edge color scale", edge_colorscale)
-    # print("Node color scale",colorscale)
-
-    edge_trace = go.Scatter( x=edge_x, y=edge_y, mode = 'lines',
+    edge_trace = go.Scatter( x=edge_x, y=edge_y, mode='lines',
         line=dict(width=1), hoverinfo='none',
         marker=dict(
+            # color='rgb(0,255,0)',
             color=edge_color,
             colorscale=edge_colorscale,
-            # cmin=0,
-            # cmax=1
+            cmin=0,
+            cmax=1
         )
     )
 
