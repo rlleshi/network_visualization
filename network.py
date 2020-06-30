@@ -145,18 +145,12 @@ def get_search_indices(search, search_type, G):
     elif search_type == 'node1,node2':
         search3=True
 
-    # Maybe use partition() and therefore remove try/catch?
-    # Or it makes sense since we do error check?
-    try:
-        search, sk = search.split(",", 1)
-        search = search.strip()
-        sk = sk.strip()
-    except ValueError:
-        search = search.strip()
-        search1 = search3 = False
+    searched = search.partition(',')
+    searched = [s.strip() for s in searched]
 
     if search1:
         found=False
+        search, sk = searched[0], searched[2]
 
         # Get the real value of the original node. When the graph was generated,
         # random spaces were mixed with the node name because many nodes occur
@@ -167,10 +161,8 @@ def get_search_indices(search, search_type, G):
                     search=node
                     found=True
                     break
-
         if found:
             # First we add all the sk nodes and then the attributes
-
             # Add parent sK node
             highlighted.append(sk)
 
@@ -184,33 +176,31 @@ def get_search_indices(search, search_type, G):
                         highlighted.append(edge[0])
 
             highlighted.append(search)
-
     elif search2:
+        search, rest = searched[0], searched[2]
         for node in G.nodes:
             if node.lstrip(" ").rstrip(" ") == search:
                 highlighted.append(node)
 
         # If the user searched more than one node
-        if 'sk' in locals():
-            while len(sk)>0:
-                otherNodes = sk.partition(',')
-                currentNode = otherNodes[0].strip()
+        if len(rest) > 0:
+            rest = rest.split(',')
+            for search in rest:
                 for node in G.nodes:
-                    if node.lstrip(" ").rstrip(" ") == currentNode:
+                    if node.lstrip(" ").rstrip(" ") == search:
                         highlighted.append(node)
-                sk = otherNodes[2]
 
     elif search3:
-        searchNodes = [search]
+        searchNodes = [searched[0]]
         for i in range(1, 4):
-            searchNodes.append(search+" "*i)
-            searchNodes.append(i*" "+search)
-            searchNodes.append(i*" "+search+" "*i)
-            searchNodes.append(sk+" "*i)
-            searchNodes.append(i*" "+sk)
-            searchNodes.append(i*" "+sk+" "*i)
+            searchNodes.append(searched[0]+" "*i)
+            searchNodes.append(i*" "+searched[0])
+            searchNodes.append(i*" "+searched[0]+" "*i)
+            searchNodes.append(searched[2]+" "*i)
+            searchNodes.append(i*" "+searched[2])
+            searchNodes.append(i*" "+searched[2]+" "*i)
 
-        searchNodes.append(sk)
+        searchNodes.append(searched[2])
         # Filter all the nodes that actually are in the graph
         searchNodes = [node for node in searchNodes if G.has_node(node)]
 
@@ -230,7 +220,9 @@ def get_search_indices(search, search_type, G):
         global node_paths
         node_paths = highlighted
 
-    if (type(highlighted[0]) is list) & (len(highlighted) > 0):
+    if len(highlighted) == 0:
+        return [], False, False, False
+    elif (type(highlighted[0]) is list) & (len(highlighted) > 0):
         return highlighted[0], search1, search2, search3
     else:
         return highlighted, search1, search2, search3
@@ -270,7 +262,7 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
     search2=False
     search3=False
 
-    # Names of nodes highlighted, so that for highlighting the corresponding edges
+    # Names of nodes highlighted, for highlighting the corresponding edges
     highlighted_names=[]
 
     # Next Path search
@@ -288,15 +280,14 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
         # Reset any global paths
         global node_paths
         node_paths=[]
-
         highlighted, search1, search2, search3 = get_search_indices(searchValue, search_type, G)
-        highlighted_names = highlighted
-        Gnodes = np.array(G.nodes)
-        highlighted = [int(np.where(Gnodes==node)[0]) for node in highlighted]
 
         if len(highlighted)==0:
-            errorMessage="The searched node/path does not exist. Make sure the input format is correct."
+            errorMessage="The searched node/path does not exist. Also, make sure the input format is correct."
         else:
+            highlighted_names = highlighted
+            Gnodes = np.array(G.nodes)
+            highlighted = [int(np.where(Gnodes==node)[0]) for node in highlighted]
             if search1:
                 for i in range(len(highlighted)):
                     if i<len(highlighted)-1:
@@ -351,6 +342,23 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
     edge_trace1['marker'] = dict(color='rgb(0,255,0)')
     edge_trace2['marker'] = dict(color=normal_edge_color)
 
+    # Annotations in order to add labels for the edges
+    annotations_list = [
+        dict(
+            x = label[1],
+            y = label[2],
+            xref = 'x',
+            yref = 'y',
+            text = label[0],
+            showarrow=False,
+            opacity=0.7,
+            ax = label[1],
+            ay = label[2]
+        )
+    for label in edge_labels
+    ]
+    edge_trace = [edge_trace1, edge_trace2]
+
     # Colorscale corresponding to colors for nodes
     if (len(highlighted)>0) & (search1):
         colorscale = [[0, 'rgba(41, 128, 185, 0.2)'], [0.3, 'rgba(192, 57, 43, 1)'],
@@ -372,23 +380,6 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
                     )
                 )
 
-    # Annotations in order to add labels for the edges
-    annotations_list = [
-        dict(
-            x = label[1],
-            y = label[2],
-            xref = 'x',
-            yref = 'y',
-            text = label[0],
-            showarrow=False,
-            opacity=0.7,
-            ax = label[1],
-            ay = label[2]
-        )
-    for label in edge_labels
-    ]
-
-    edge_trace = [edge_trace1, edge_trace2]
     data = edge_trace +[node_trace]
 
     # Finally, create layout
