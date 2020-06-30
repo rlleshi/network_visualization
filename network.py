@@ -206,13 +206,11 @@ def get_search_indices(search, search_type, G):
             searchNodes.append(search+" "*i)
             searchNodes.append(i*" "+search)
             searchNodes.append(i*" "+search+" "*i)
-
-        searchNodes.append(sk)
-        for i in range(1,4):
             searchNodes.append(sk+" "*i)
             searchNodes.append(i*" "+sk)
             searchNodes.append(i*" "+sk+" "*i)
 
+        searchNodes.append(sk)
         # Filter all the nodes that actually are in the graph
         searchNodes = [node for node in searchNodes if G.has_node(node)]
 
@@ -232,15 +230,10 @@ def get_search_indices(search, search_type, G):
         global node_paths
         node_paths = highlighted
 
-        # Return the indices for the first path
-        Gnodes = np.array(G.nodes)
-        if len(highlighted) > 0:
-            highlighted = [int(np.where(Gnodes==node)[0]) for node in highlighted[0]]
+    if (type(highlighted[0]) is list) & (len(highlighted) > 0):
+        return highlighted[0], search1, search2, search3
+    else:
         return highlighted, search1, search2, search3
-
-    Gnodes = np.array(G.nodes)
-    highlighted = [int(np.where(Gnodes==node)[0]) for node in highlighted]
-    return highlighted, search1, search2, search3
 
 def get_clicked_path(n_clicks, paths):
     """ Get the path based on the number of times the button was clicked.
@@ -265,24 +258,24 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
     node_x = []
     node_y = []
     node_labels = []
-
     for key, value in pos.items():
         x, y = value[0], value[1]
         node_x.append(x)
         node_y.append(y)
         node_labels.append(key)
 
-    # This array will be used with a colorscale in order to define the color of the node
-    # This array will contain the indices. The colorscale will map them to the color.
     node_color = np.array([1.0 if node.find('sK')!=-1  else 0 for node in node_labels])
-
-    errorMessage=" "
+    errorMessage=""
     search1=False
     search2=False
     search3=False
 
-    # Another path is being searched by clicking on the button
+    # Names of nodes highlighted, so that for highlighting the corresponding edges
+    highlighted_names=[]
+
+    # Next Path search
     if len(highlighted) > 0:
+        highlighted_names = highlighted
         Gnodes = np.array(G.nodes)
         # Get the indices
         highlighted=[int(np.where(Gnodes==node)[0]) for node in highlighted]
@@ -290,13 +283,16 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
             node_color[highlighted[i]] = 0.5
         search3 = True
 
-    # A node has been searched
+    # Node/Path has been searched
     elif len(searchValue)>0:
         # Reset any global paths
         global node_paths
         node_paths=[]
 
         highlighted, search1, search2, search3 = get_search_indices(searchValue, search_type, G)
+        highlighted_names = highlighted
+        Gnodes = np.array(G.nodes)
+        highlighted = [int(np.where(Gnodes==node)[0]) for node in highlighted]
 
         if len(highlighted)==0:
             errorMessage="The searched node/path does not exist. Make sure the input format is correct."
@@ -312,39 +308,48 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
                 for i in range(len(highlighted)):
                     node_color[highlighted[i]] = 0.5
 
-    # Edges information for edge trace
-    edge_x = []
-    edge_y = []
+    edge_trace1 = go.Scatter( x=[], y=[], mode='lines',
+        line=dict(width=1), hoverinfo='none',
+    )
+    edge_trace2 = go.Scatter( x=[], y=[], mode='lines',
+        line=dict(width=1), hoverinfo='none',
+    )
     edge_labels = []
 
-    for edge in G.edges().data():
+    for i, edge in enumerate(G.edges().data()):
         x0, y0 = pos[edge[0]]
         x1, y1 = pos[edge[1]]
-        edge_x.append(x0)
-        edge_x.append(x1)
-        edge_x.append(None)
-        edge_y.append(y0)
-        edge_y.append(y1)
-        edge_y.append(None)
 
+        if len(node_paths)>0:
+            changed_color=False
+            for i in range(0, len(highlighted_names)-1):
+                if (((edge[0] == highlighted_names[i]) & (edge[1] == highlighted_names[i+1])) |
+                    ((edge[0] == highlighted_names[i+1]) & (edge[1] == highlighted_names[i]))):
+                    edge_trace1['x'] += tuple([x0,x1,None])
+                    edge_trace1['y'] += tuple([y0,y1,None])
+                    changed_color=True
+            if changed_color == False:
+                edge_trace2['x'] += tuple([x0,x1,None])
+                edge_trace2['y'] += tuple([y0,y1,None])
+        else:
+            edge_trace2['x'] += tuple([x0,x1,None])
+            edge_trace2['y'] += tuple([y0,y1,None])
         # Get the edge label
         label = [val for val in edge[2].values()]
 
         # Create the middle line coordinates where we shall add the label of the edge
         ax = (x0+x1)/2
         ay = (y0+y1)/2
-
         # Not all edges have a label
         if len(label) > 0:
             edge_labels.append((label[0], ax, ay))
-        # else:
-        #     edge_labels.append((None, None, None))
 
-    edge_color = np.array([0 for i in range(len(edge_x))])
-    print('edge_x', len(edge_x))
-    print('#edges', len(G.edges().data()))
-    print('label edges', len(edge_labels))
-    print("Edge_color", len(edge_color))
+    normal_edge_color = 'rgba(100,100,100,0.6)'
+    if len(node_paths)>0:
+        normal_edge_color = 'rgba(100,100,100,0.1)'
+
+    edge_trace1['marker'] = dict(color='rgb(0,255,0)')
+    edge_trace2['marker'] = dict(color=normal_edge_color)
 
     # Colorscale corresponding to colors for nodes
     if (len(highlighted)>0) & (search1):
@@ -366,24 +371,6 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
                         line=dict(color='rgb(180,255,255)', width=1)
                     )
                 )
-    print('node_x', len(node_x))
-    print('#nodes', len(G.nodes().data()))
-    print('label nodes', len(node_labels))
-    print("Node_color", len(node_color))
-
-    # edge_colorscale=[[0, 'rgb(0,255,0)'], [1, 'rgb(0, 0, 90)']]
-    edge_colorscale=[[0, 'rgb(0, 255, 0)']]
-
-    edge_trace = go.Scatter( x=edge_x, y=edge_y, mode='lines',
-        line=dict(width=1), hoverinfo='none',
-        marker=dict(
-            # color='rgb(0,255,0)',
-            color=edge_color,
-            colorscale=edge_colorscale,
-            cmin=0,
-            cmax=1
-        )
-    )
 
     # Annotations in order to add labels for the edges
     annotations_list = [
@@ -401,7 +388,8 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
     for label in edge_labels
     ]
 
-    data = [edge_trace, node_trace]
+    edge_trace = [edge_trace1, edge_trace2]
+    data = edge_trace +[node_trace]
 
     # Finally, create layout
     layout = go.Layout(
