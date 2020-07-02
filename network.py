@@ -231,6 +231,10 @@ def get_search_indices(search, search_type, G):
                     pos.append(i)
             pos.append(len(searchNodes)-1)
 
+            # Single path error
+            if pos[-1] == pos[len(pos)-2]:
+                pos[-1]+=1
+
             searchNodes = unflatten(searchNodes, pos)
             for items in product(*searchNodes):
                 c_paths=[]
