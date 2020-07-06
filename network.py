@@ -120,13 +120,14 @@ def build_graph(nodes, edges):
 
 # TODO: Refactor
 def unflatten(l, ind):
-    """Unflatten lists containing more than 3 unique elements given the indices."""
+    """Unflatten lists containing more than 3 unique elements given the indices.
+        Necessary to perform path search of multiple group nodes via itertools.product"""
     s = 0
     u_l = []
     for i in range(len(ind)):
-        c_l = l[s:ind[i]]
+        c_l = l[s:ind[i]+1]
         u_l.append(c_l)
-        s = ind[i]
+        s = ind[i]+1
     return u_l
 
 # TODO: See if you can re-factor and make the code more succint
@@ -203,78 +204,47 @@ def get_search_indices(search, search_type, G):
                         highlighted.append(node)
 
     elif search3:
-        # TODO: Need to refactor this
         global node_paths
         searchNodes = [searched[0]]
-        if len(searched[2].partition(",")[2])>0:
-            searched[2]=[el for el in searched[2].split(',')]
-            print(searched[2])
-            print(type(searched[2]))
+        for i in range(1, 4):
+            searchNodes.append(searched[0]+" "*i)
+            searchNodes.append(i*" "+searched[0])
+            searchNodes.append(i*" "+searched[0]+" "*i)
+
+        otherNodes=[el for el in searched[2].split(',')]
+        for node in otherNodes:
+            searchNodes.append(node)
             for i in range(1, 4):
-                searchNodes.append(searched[0]+" "*i)
-                searchNodes.append(i*" "+searched[0])
-                searchNodes.append(i*" "+searched[0]+" "*i)
+                searchNodes.append(node+" "*i)
+                searchNodes.append(i*" "+node)
+                searchNodes.append(i*" "+node+" "*i)
+        # Filter all the nodes that actually are in the graph
+        searchNodes = [node for node in searchNodes if G.has_node(node)]
 
-            for node in searched[2]:
-                searchNodes.append(node)
-                for i in range(1, 4):
-                    searchNodes.append(node+" "*i)
-                    searchNodes.append(i*" "+node)
-                    searchNodes.append(i*" "+node+" "*i)
+        pos=[]
+        for i in range(0, len(searchNodes)-1):
+            if searchNodes[i].strip() != searchNodes[i+1].strip():
+                pos.append(i)
+        pos.append(len(searchNodes)-1)
 
-            # Filter all the nodes that actually are in the graph
-            searchNodes = [node for node in searchNodes if G.has_node(node)]
+        # One single path exists
+        if pos[-1] == pos[len(pos)-2]:
+            pos[-1]+=1
 
-            pos=[]
-            for i in range(1, len(searchNodes)):
-                if searchNodes[i].strip() != searchNodes[i-1].strip():
-                    pos.append(i)
-            pos.append(len(searchNodes)-1)
-
-            # Single path error
-            if pos[-1] == pos[len(pos)-2]:
-                pos[-1]+=1
-
-            searchNodes = unflatten(searchNodes, pos)
-            for items in product(*searchNodes):
-                c_paths=[]
-                is_path=False
-                for i in range(len(items)-1):
-                    is_path = False
-                    for path in nx.all_simple_paths(G, items[i], items[i+1]):
-                        is_path=True
-                        c_paths += path
-                    if not is_path:
-                        break
-                if is_path:
-                    highlighted.append(c_paths)
-            node_paths = highlighted
-        else:
-            for i in range(1, 4):
-                searchNodes.append(searched[0]+" "*i)
-                searchNodes.append(i*" "+searched[0])
-                searchNodes.append(i*" "+searched[0]+" "*i)
-                searchNodes.append(searched[2]+" "*i)
-                searchNodes.append(i*" "+searched[2])
-                searchNodes.append(i*" "+searched[2]+" "*i)
-
-            searchNodes.append(searched[2])
-            # Filter all the nodes that actually are in the graph
-            searchNodes = [node for node in searchNodes if G.has_node(node)]
-
-            # Find the index where the second nodes start
-            pos = 0
-            for i in range(len(searchNodes)):
-                if searchNodes[i].strip() != searchNodes[i-1].strip():
-                    pos = i
-
-            # Finally, get the paths
-            for i in range(0, pos):
-                for j in range(pos, len(searchNodes)):
-                    paths = nx.all_simple_paths(G, searchNodes[i], searchNodes[j])
-                    for path in paths:
-                        highlighted.append(path)
-            node_paths = highlighted
+        searchNodes = unflatten(searchNodes, pos)
+        for items in product(*searchNodes):
+            c_paths=[]
+            is_path=False
+            for i in range(len(items)-1):
+                is_path = False
+                for path in nx.all_simple_paths(G, items[i], items[i+1]):
+                    is_path=True
+                    c_paths += path
+                if not is_path:
+                    break
+            if is_path:
+                highlighted.append(c_paths)
+        node_paths = highlighted
 
     if len(highlighted) == 0:
         return [], False, False, False
