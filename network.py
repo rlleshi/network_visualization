@@ -118,9 +118,8 @@ def build_graph(nodes, edges):
         G.add_edge(first,second,Label=edge.split("(")[0])
     return G
 
-# TODO: Refactor
 def unflatten(l, ind):
-    """Unflatten lists containing more than 3 unique elements given the indices.
+    """ Unflatten lists given the indices of the start of the different node groups.
         Necessary to perform path search of multiple group nodes via itertools.product"""
     s = 0
     u_l = []
@@ -131,10 +130,9 @@ def unflatten(l, ind):
     return u_l
 
 # TODO: See if you can re-factor and make the code more succint
-def get_search_indices(search, search_type, G):
-    """Get the indices of the searched nodes. There can be three kinds of search.
+def get_search_nodes(search, search_type, G):
+    """Get the searched nodes. There can be three kinds of search.
        The user can search individual nodes(1), nodes with the sK parent(2) and paths(3).
-       Paths can be searched only between attributes of sK-nodes.
 
     Arguments:
         search {string} -- The node/nodes
@@ -306,7 +304,7 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
         # Reset any global paths
         global node_paths
         node_paths=[]
-        highlighted, search1, search2, search3 = get_search_indices(searchValue, search_type, G)
+        highlighted, search1, search2, search3 = get_search_nodes(searchValue, search_type, G)
 
         if len(highlighted)==0:
             errorMessage="The searched node/path does not exist. Also, make sure the input format is correct."
@@ -320,8 +318,14 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
                         node_color[highlighted[i]] = 0.3
                     else:
                         node_color[highlighted[i]] = 0.5
-            elif (search2) | (search3):
-                # Singular node or a path was searched
+            elif search2:
+                # Node search
+                val = 0
+                for i in range(len(highlighted)):
+                    val+=0.1
+                    node_color[highlighted[i]] = val
+            else:
+                # Path search
                 for i in range(len(highlighted)):
                     node_color[highlighted[i]] = 0.5
 
@@ -389,8 +393,13 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
     if (len(highlighted)>0) & (search1):
         colorscale = [[0, 'rgba(41, 128, 185, 0.2)'], [0.3, 'rgba(192, 57, 43, 1)'],
                     [0.5, 'rgba(41, 128, 185, 1)'],  [1.0, 'rgba(192, 57, 43, 0.2)']]
-    elif (len(highlighted)>0) & ((search2) | (search3)):
+    elif (len(highlighted)>0) & (search3):
         colorscale = [[0, 'rgba(41, 128, 185, 0.4)'], [0.5, 'rgba(0, 255, 0, 1)'],
+                    [1.0, 'rgba(192, 57, 43, 0.4)']]
+    elif (len(highlighted)>0) & (search2):
+        colorscale = [[0, 'rgba(41, 128, 185, 0.4)'], [0.1, 'rgba(0, 255, 0, 1)'],
+                    [0.2, 'rgba(0, 255, 255, 1)'], [0.3, 'rgba(255, 255, 0, 1)'],
+                    [0.4, 'rgba(139, 69, 19, 1)'], [0.5, 'rgba(220, 20, 60, 1)'],
                     [1.0, 'rgba(192, 57, 43, 0.4)']]
     else:
         colorscale = [[0, 'rgba(41, 128, 185, 1)'], [1, 'rgba(192, 57, 43, 1)']]
@@ -412,7 +421,20 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
     layout = go.Layout(
         width = 1250,
         height = 600,
-        showlegend=False,
+        showlegend=True,
+        legend=dict(
+            x=0,
+            y=1,
+            traceorder="normal",
+            font=dict(
+                family="sans-serif",
+                size=12,
+                color="black"
+            ),
+            bgcolor="LightSteelBlue",
+            bordercolor="Black",
+            borderwidth=2),
+        legend_orientation='h',
         plot_bgcolor="rgb(255, 255, 250)",
         hovermode='closest',
         #clickmode='event+select',
@@ -427,7 +449,7 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
 
 
 if __name__ == '__main__':
-     # Initialize the graph with no data
+    # Initialize the graph with no data
     fig = go.Figure(data=None, layout = go.Layout(
                 width = 1250,
                 height = 600,
