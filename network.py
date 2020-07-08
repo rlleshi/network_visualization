@@ -62,7 +62,7 @@ def process_file(content, file_extension):
                 edges.append(d)
             else:
                 nodes.append(d)
-    return nodes, edges
+    return sorted(nodes), edges
 
 def rreplace(string, old, new, occurrence):
     """ Replace the last occurrences of a string.
@@ -600,7 +600,8 @@ if __name__ == '__main__':
             G = build_graph(nodes, edges)
 
             # Calculate node positions
-            pos = nx.nx_pydot.graphviz_layout(G)
+            # Try out the following: sfdp; twopi; circo
+            pos = nx.nx_pydot.graphviz_layout(G, prog='neato')
             graph, _ = visualize_graph(G, pos)
             return graph, json.dumps(json_graph.node_link_data(G)), json.dumps(pos), {'display': 'none'}, ''
 
