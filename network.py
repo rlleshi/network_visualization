@@ -601,6 +601,7 @@ if __name__ == '__main__':
 
             # Calculate node positions
             # Try out the following: sfdp; twopi; circo
+            # Additionally, you can try: dot, fdp. Though I didn't find these so good
             pos = nx.nx_pydot.graphviz_layout(G, prog='neato')
             graph, _ = visualize_graph(G, pos)
             return graph, json.dumps(json_graph.node_link_data(G)), json.dumps(pos), {'display': 'none'}, ''
