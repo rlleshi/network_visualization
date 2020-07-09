@@ -1,117 +1,81 @@
-import sys
 import random
 import base64
-import io
 import numpy as np
 import networkx as nx
-from networkx.readwrite import json_graph
 import json
 import plotly.graph_objs as go
 from textwrap import dedent as d
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
-from dash.exceptions import PreventUpdate
 from itertools import product
 
-
 ##################################################################################################################################
-# Docs on NetworkX: https://networkx.github.io/documentation/stable/index.html
-#
-# Docs on Dash Plotly: https://dash.plotly.com/
-#
-# Docs on Plotly: https://plotly.com/python/network-graphs/
-#                 https://plotly.com/python/reference/
+# Docs on NetworkX: https://networkx.github.io/documentation/stable/index.html                                                   #
+#                                                                                                                                #
+# Docs on Dash Plotly: https://dash.plotly.com/                                                                                  #
+#                                                                                                                                #
+# Docs on Plotly: https://plotly.com/python/network-graphs/                                                                      #
+#                 https://plotly.com/python/reference/                                                                           #
 ##################################################################################################################################
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 app.title = "FOL Network"
 
-# Global variable for storing paths
-# If the app will be used by multiple people, then the paths should not be saved in a global var
-node_paths=[]
+# If the app will be used by multiple users, for storing paths in a global variables should be reconsidered
+global_paths=[]
 # Its very important to have a seed for graph stability considering the implementation
 random.seed(3)
 
 def process_file(content, file_extension):
-    """ Process the file containing the graph and return its nodes and edges.
-        Only processes .txt and .p files.
-
-    Arguments:
-        file {string} -- The file
-        file_extension {string} -- Type of file. Either .txt or .p
-
-    Returns:
-        list -- Two lists, nodes and edges of the graph
+    """ Process the file (.txt or .p) containing the graph and return its nodes and edges.
     """
+    data, nodes, edges = [], [], []
     if file_extension == 'txt':
-        data = [el.strip() for el in content.split(".")]
+        data = [el.strip() for el in content.split(".") if len(el.strip())>0]
     elif file_extension == 'p':
-        data = [el.strip() for el in content.split(":")[1].split("%")[0].split(".")]
-    else:
-        data=[]
+        data = [el.strip() for el in content.split(":")[1].split("%")[0].split(".") if len(el.strip())>0]
 
-    nodes = []
-    edges = []
-    for d in data:
-        if len(d) > 1:
-            # This string manipulation is dependent on the structure of the files
-            split = d.split("(", maxsplit=1)[1]
-            if (split.find("(")==-1) & (split.find(",")!=-1):
-                edges.append(d)
-            else:
-                nodes.append(d)
+    for row in data:
+        split = row.split("(", maxsplit=1)[1]
+        if (split.find("(")==-1) & (split.find(",")!=-1):
+            edges.append(row)
+        else:
+            nodes.append(row)
     return sorted(nodes), edges
 
 def rreplace(string, old, new, occurrence):
-    """ Replace the last occurrences of a string.
-        Python's build in function only works starting from the beginning and not the end.
+    """ Replace the last occurrences of a string starting from the end.
     """
     li = string.rsplit(old, occurrence)
     return new.join(li)
 
 def build_graph(nodes, edges):
     """ Build a graph given its nodes and edges.
-
-   Arguments:
-       nodes {list} -- The nodes of the graph
-       edges {list} -- The edges of the graph
-
-   Returns:
-       DiGraph -- A directed graph representing the network
-   """
-    # G = nx.DiGraph()
+    """
     G = nx.Graph()
+    [G.add_node(rreplace(node.split("(", maxsplit=1)[1], ")", "", 1)) for node in nodes] # sK nodes
 
-    # Add SK nodes
-    [G.add_node(rreplace(node.split("(", maxsplit=1)[1], ")", "", 1)) for node in nodes]
-
-    # Add other nodes
+    # other nodes
     for node in nodes:
         n, sk = node.split("(",maxsplit=1)[0], rreplace(node.split("(", maxsplit=1)[1], ")", "", 1)
 
-        # If there are nodes with the name 'node', neato (which is used for visualization) throws
-        # an odd error for some reason. Therefore we simply append an empty space if this is the case
+        # For nodes named 'node', neato (which is used for visualization) throws an (odd) error
         if n == 'node':
             n = " "+n
 
-        # If the node is already in the graph, then add random spaces till we get a unique node
+        # A graph cannot have nodes with the same name
         while n in G.nodes():
             if random.random() > 0.5:
                 n = " "+n
             else:
                 n = n + " "
         G.add_node(n)
+        G.nodes[n]['sk']=sk # Node label = (parent) sK
+        G.add_edge(n, sk) # Edge to (parent) sK
 
-        # Add the parent SK as a label
-        G.nodes[n]['sk']=sk
-
-        # Add an edge with the parent sK
-        G.add_edge(n, sk)
-
-
-    # Add edges for SK
+    # sK edges
     for edge in edges:
         first, second = edge.split("(",maxsplit=1)[1].split(",")
         second = second.replace(")", "", 1).strip()
@@ -120,7 +84,7 @@ def build_graph(nodes, edges):
 
 def unflatten(l, ind):
     """ Unflatten lists given the indices of the start of the different node groups.
-        Necessary to perform path search of multiple group nodes via itertools.product"""
+    """
     s = 0
     u_l = []
     for i in range(len(ind)):
@@ -129,25 +93,9 @@ def unflatten(l, ind):
         s = ind[i]+1
     return u_l
 
-# TODO: See if you can re-factor and make the code more succint
 def get_search_nodes(search, search_type, G):
-    """Get the searched nodes. There can be three kinds of search.
-       The user can search individual nodes(1), nodes with the sK parent(2) and paths(3).
-
-    Arguments:
-        search {string} -- The node/nodes
-        G {Graph} -- The graph
-
-    Returns:
-        list -- A list of indices of the searched nodes
-        search1 -- First type of search, node with sK
-        search2 -- Second type of search, only a node
-        search3 -- Third type of search, paths
-    """
     highlighted = []
-    search1 = False
-    search2 = False
-    search3 = False
+    search1, search2, search3 = False, False, False
 
     if search_type == 'node,sKx':
         search1=True
@@ -163,21 +111,18 @@ def get_search_nodes(search, search_type, G):
         found=False
         search, sk = searched[0], searched[2]
 
-        # Get the real value of the original node. When the graph was generated,
-        # random spaces were mixed with the node name because many nodes occur
-        # more than once and a node name must be unique
+        # Get the original node with starting/ending whitespace
         for node in G.nodes:
-            if len(G.nodes[node].items()) > 0:
+            if len(G.nodes[node].items())>0:
                 if (G.nodes[node]['sk'] == sk) & (node.strip()==search):
                     search=node
                     found=True
                     break
+
         if found:
-            # First we add all the sk nodes and then the attributes
-            # Add parent sK node
             highlighted.append(sk)
 
-            # Add the neighboring sK
+            # neighboring sK
             for edge in G.edges:
                 if edge[0] == sk:
                     if edge[1].find("sK") != -1:
@@ -185,8 +130,8 @@ def get_search_nodes(search, search_type, G):
                 elif edge[1] == sk:
                     if edge[0].find("sK") != -1:
                         highlighted.append(edge[0])
-
             highlighted.append(search)
+
     elif search2:
         search, rest = searched[0], searched[2]
         for node in G.nodes:
@@ -202,7 +147,7 @@ def get_search_nodes(search, search_type, G):
                         highlighted.append(node)
 
     elif search3:
-        global node_paths
+        global global_paths
         searchNodes = [searched[0]]
         for i in range(1, 4):
             searchNodes.append(searched[0]+" "*i)
@@ -242,7 +187,7 @@ def get_search_nodes(search, search_type, G):
                     break
             if is_path:
                 highlighted.append(c_paths)
-        node_paths = highlighted
+        global_paths = highlighted
 
     if len(highlighted) == 0:
         return [], False, False, False
@@ -302,8 +247,8 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
     # Node/Path has been searched
     elif len(searchValue)>0:
         # Reset any global paths
-        global node_paths
-        node_paths=[]
+        global global_paths
+        global_paths=[]
         highlighted, search1, search2, search3 = get_search_nodes(searchValue, search_type, G)
 
         if len(highlighted)==0:
@@ -341,7 +286,7 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
         x0, y0 = pos[edge[0]]
         x1, y1 = pos[edge[1]]
 
-        if len(node_paths)>0:
+        if len(global_paths)>0:
             changed_color=False
             for i in range(0, len(highlighted_names)-1):
                 if (((edge[0] == highlighted_names[i]) & (edge[1] == highlighted_names[i+1])) |
@@ -366,7 +311,7 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
             edge_labels.append((label[0], ax, ay))
 
     normal_edge_color = 'rgba(100,100,100,0.6)'
-    if len(node_paths)>0:
+    if len(global_paths)>0:
         normal_edge_color = 'rgba(100,100,100,0.1)'
 
     edge_trace1['marker'] = dict(color='rgb(0,255,0)')
@@ -590,7 +535,7 @@ if __name__ == '__main__':
         component_value = ctx.triggered[0]['value']
 
         if (component_value == None) | (component_value == 0):
-            raise PreventUpdate
+            raise dash.exceptions.PreventUpdate
         if component_name == 'upload-data':
             content = content.split(',')[1]
             decoded_content = base64.b64decode(content).decode('utf-8')
@@ -604,31 +549,31 @@ if __name__ == '__main__':
             # Additionally, you can try: dot, fdp. Though I didn't find these so good
             pos = nx.nx_pydot.graphviz_layout(G, prog='neato')
             graph, _ = visualize_graph(G, pos)
-            return graph, json.dumps(json_graph.node_link_data(G)), json.dumps(pos), {'display': 'none'}, ''
+            return graph, json.dumps(nx.readwrite.json_graph.node_link_data(G)), json.dumps(pos), {'display': 'none'}, ''
 
         else:
             try:
-                G = json_graph.node_link_graph(json.loads(G))
+                G = nx.readwrite.json_graph.node_link_graph(json.loads(G))
                 pos = json.loads(pos)
             except TypeError:
-                raise PreventUpdate
-            global node_paths
+                raise dash.exceptions.PreventUpdate
+            global global_paths
 
             if component_name == 'input':
                 graph, error = visualize_graph(G, pos, search_value, search_type)
-                if len(node_paths) > 1:
+                if len(global_paths) > 1:
                     button_display = {'display': 'block'}
                 else:
                     button_display = {'display':'none'}
-                return graph, json.dumps(json_graph.node_link_data(G)), json.dumps(pos), button_display, error
+                return graph, json.dumps(nx.readwrite.json_graph.node_link_data(G)), json.dumps(pos), button_display, error
             elif (component_name == 'next-path-btn'):
                 if n_clicks > 0:
                     # Display other paths
-                    highlighted = get_clicked_path(n_clicks, node_paths)
+                    highlighted = get_clicked_path(n_clicks, global_paths)
                     graph, error = visualize_graph(G, pos, '', '', highlighted)
-                    return graph, json.dumps(json_graph.node_link_data(G)), json.dumps(pos), {'display': 'block'}, error
+                    return graph, json.dumps(nx.readwrite.json_graph.node_link_data(G)), json.dumps(pos), {'display': 'block'}, error
             else:
-                raise PreventUpdate
+                raise dash.exceptions.PreventUpdate
 
     app.run_server(debug=True, use_reloader=False,dev_tools_hot_reload=True)
     # app.run_server(debug=True,dev_tools_ui=False,dev_tools_props_check=False)
