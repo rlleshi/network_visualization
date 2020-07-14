@@ -83,7 +83,7 @@ def build_graph(nodes, edges):
     return G
 
 def unflatten(l, ind):
-    """ Unflatten lists given the indices of the start of the different node groups.
+    """ Unflatten a list given the starting indices of the different node groups inside that list.
     """
     s = 0
     u_l = []
@@ -99,7 +99,7 @@ def get_search_nodes(search, search_type, G):
 
     if search_type == 'node,sKx':
         search1=True
-    elif search_type == 'node':
+    elif search_type == 'node(s)':
         search2=True
     elif search_type == 'node1,node2':
         search3=True
@@ -197,142 +197,61 @@ def get_search_nodes(search, search_type, G):
         return highlighted, search1, search2, search3
 
 def get_clicked_path(n_clicks, paths):
-    """ Get the path based on the number of times the button was clicked.
+    return paths[n_clicks % len(paths)]
 
-    Arguments:
-        n_clicks {int} -- number of clicks
-        paths {list} -- global array storing the paths
-
-    Returns:
-        A single next path based on the number of clicks
-    """
-    if n_clicks < len(paths):
-        return paths[n_clicks]
-    else:
-        while n_clicks > len(paths)-1:
-            n_clicks = (n_clicks/len(paths)-1) * len(paths)
-        return paths[round(n_clicks)]
-
-#TODO Method documentation
-def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
+def visualize_graph(G, node_pos, search_value='', search_type='', highlighted=[]):
     # Nodes information
     node_x = []
     node_y = []
     node_labels = []
-    for key, value in pos.items():
+    for key, value in node_pos.items():
         x, y = value[0], value[1]
         node_x.append(x)
         node_y.append(y)
         node_labels.append(key)
 
     node_color = np.array([1.0 if node.find('sK')!=-1  else 0 for node in node_labels])
-    errorMessage=""
-    search1=False
-    search2=False
-    search3=False
+    error_message=""
+    search1, search2, search3 = False, False, False
+    highlighted_names=[] # Names of nodes highlighted, used for highlighting the corresponding edges
 
-    # Names of nodes highlighted, for highlighting the corresponding edges
-    highlighted_names=[]
-
-    # Next Path search
+    # "Next Path" button search
     if len(highlighted) > 0:
         highlighted_names = highlighted
         Gnodes = np.array(G.nodes)
-        # Get the indices
-        highlighted=[int(np.where(Gnodes==node)[0]) for node in highlighted]
+        highlighted=[int(np.where(Gnodes==node)[0]) for node in highlighted] # Get the indices
+
         for i in range(len(highlighted)):
             node_color[highlighted[i]] = 0.5
         search3 = True
 
     # Node/Path has been searched
-    elif len(searchValue)>0:
+    elif len(search_value)>0:
         # Reset any global paths
         global global_paths
         global_paths=[]
-        highlighted, search1, search2, search3 = get_search_nodes(searchValue, search_type, G)
+        highlighted, search1, search2, search3 = get_search_nodes(search_value, search_type, G)
 
         if len(highlighted)==0:
-            errorMessage="The searched node/path does not exist. Also, make sure the input format is correct."
+            error_message="The searched node/path does not exist or the input format is incorrect."
         else:
             highlighted_names = highlighted
             Gnodes = np.array(G.nodes)
             highlighted = [int(np.where(Gnodes==node)[0]) for node in highlighted]
-            if search1:
+            if search1: # Node,sK search
                 for i in range(len(highlighted)):
                     if i<len(highlighted)-1:
                         node_color[highlighted[i]] = 0.3
                     else:
                         node_color[highlighted[i]] = 0.5
-            elif search2:
-                # Node search
+            elif search2: # Node search
                 val = 0
                 for i in range(len(highlighted)):
                     val+=0.1
                     node_color[highlighted[i]] = val
-            else:
-                # Path search
+            else: # Path search
                 for i in range(len(highlighted)):
                     node_color[highlighted[i]] = 0.5
-
-    edge_trace1 = go.Scatter( x=[], y=[], mode='lines',
-        line=dict(width=1), hoverinfo='none',
-    )
-    edge_trace2 = go.Scatter( x=[], y=[], mode='lines',
-        line=dict(width=1), hoverinfo='none',
-    )
-    edge_labels = []
-
-    for i, edge in enumerate(G.edges().data()):
-        x0, y0 = pos[edge[0]]
-        x1, y1 = pos[edge[1]]
-
-        if len(global_paths)>0:
-            changed_color=False
-            for i in range(0, len(highlighted_names)-1):
-                if (((edge[0] == highlighted_names[i]) & (edge[1] == highlighted_names[i+1])) |
-                    ((edge[0] == highlighted_names[i+1]) & (edge[1] == highlighted_names[i]))):
-                    edge_trace1['x'] += tuple([x0,x1,None])
-                    edge_trace1['y'] += tuple([y0,y1,None])
-                    changed_color=True
-            if changed_color == False:
-                edge_trace2['x'] += tuple([x0,x1,None])
-                edge_trace2['y'] += tuple([y0,y1,None])
-        else:
-            edge_trace2['x'] += tuple([x0,x1,None])
-            edge_trace2['y'] += tuple([y0,y1,None])
-        # Get the edge label
-        label = [val for val in edge[2].values()]
-
-        # Create the middle line coordinates where we shall add the label of the edge
-        ax = (x0+x1)/2
-        ay = (y0+y1)/2
-        # Not all edges have a label
-        if len(label) > 0:
-            edge_labels.append((label[0], ax, ay))
-
-    normal_edge_color = 'rgba(100,100,100,0.6)'
-    if len(global_paths)>0:
-        normal_edge_color = 'rgba(100,100,100,0.1)'
-
-    edge_trace1['marker'] = dict(color='rgb(0,255,0)')
-    edge_trace2['marker'] = dict(color=normal_edge_color)
-
-    # Annotations in order to add labels for the edges
-    annotations_list = [
-        dict(
-            x = label[1],
-            y = label[2],
-            xref = 'x',
-            yref = 'y',
-            text = label[0],
-            showarrow=False,
-            opacity=0.7,
-            ax = label[1],
-            ay = label[2]
-        )
-    for label in edge_labels
-    ]
-    edge_trace = [edge_trace1, edge_trace2]
 
     # Colorscale corresponding to colors for nodes
     if (len(highlighted)>0) & (search1):
@@ -360,9 +279,66 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
                     )
                 )
 
-    data = edge_trace +[node_trace]
+    edge_trace1 = go.Scatter( x=[], y=[], mode='lines',
+        line=dict(width=1), hoverinfo='none',
+    )
+    edge_trace2 = go.Scatter( x=[], y=[], mode='lines',
+        line=dict(width=1), hoverinfo='none',
+    )
+    edge_labels = []
 
-    # Finally, create layout
+    for i, edge in enumerate(G.edges().data()):
+        x0, y0 = node_pos[edge[0]]
+        x1, y1 = node_pos[edge[1]]
+
+        if len(global_paths)>0:
+            changed_color=False
+            for i in range(0, len(highlighted_names)-1):
+                if (((edge[0] == highlighted_names[i]) & (edge[1] == highlighted_names[i+1])) |
+                    ((edge[0] == highlighted_names[i+1]) & (edge[1] == highlighted_names[i]))):
+                    edge_trace1['x'] += tuple([x0,x1,None])
+                    edge_trace1['y'] += tuple([y0,y1,None])
+                    changed_color=True
+            if changed_color == False:
+                edge_trace2['x'] += tuple([x0,x1,None])
+                edge_trace2['y'] += tuple([y0,y1,None])
+        else:
+            edge_trace2['x'] += tuple([x0,x1,None])
+            edge_trace2['y'] += tuple([y0,y1,None])
+        # Get the edge label
+        label = [val for val in edge[2].values()]
+
+        # Create the middle line coordinates for adding edge label
+        ax = (x0+x1)/2
+        ay = (y0+y1)/2
+        if len(label) > 0: # Not all edges have a label
+            edge_labels.append((label[0], ax, ay))
+
+    normal_edge_color = 'rgba(100,100,100,0.6)'
+    if len(global_paths)>0:
+        normal_edge_color = 'rgba(100,100,100,0.1)'
+
+    edge_trace1['marker'] = dict(color='rgb(0,255,0)')
+    edge_trace2['marker'] = dict(color=normal_edge_color)
+
+    # Annotations in order to add labels for the edges
+    annotations_list = [
+        dict(
+            x = label[1],
+            y = label[2],
+            xref = 'x',
+            yref = 'y',
+            text = label[0],
+            showarrow=False,
+            opacity=0.7,
+            ax = label[1],
+            ay = label[2]
+        )
+        for label in edge_labels
+    ]
+    edge_trace = [edge_trace1, edge_trace2]
+
+    data = edge_trace +[node_trace]
     layout = go.Layout(
         width = 1250,
         height = 600,
@@ -388,7 +364,7 @@ def visualize_graph(G, pos, searchValue='', search_type='', highlighted=[]):
         xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
         yaxis=dict(showgrid=False, zeroline=False, showticklabels=False)
     )
-    return go.Figure(data=data, layout=layout), errorMessage
+    return go.Figure(data=data, layout=layout), error_message
 
 ##################################################################################################################################
 
@@ -413,12 +389,10 @@ if __name__ == '__main__':
                 className="row",
                 style={'textAlign': "center"}
         ),
-
         ### Define the components
         html.Div(
             className="row",
             children=[
-
             ### Top Upload component
             html.Div(
                 dcc.Upload(
@@ -440,7 +414,6 @@ if __name__ == '__main__':
                 ),
                 style={'text-align': 'center', 'margin-bottom':'10px'}
             ),
-
             ### Top components (below upload)
             html.Div(
                 children=[
@@ -450,7 +423,7 @@ if __name__ == '__main__':
                                 id='search_dropdown',
                                 options=[
                                     {'label':'node-sk', 'value': 'node,sKx'},
-                                    {'label':'single node', 'value': 'node'},
+                                    {'label':'single node', 'value': 'node(s)'},
                                     {'label':'paths', 'value':'node1,node2'}
                                 ],
                                 value='node,sKx',
@@ -477,7 +450,6 @@ if __name__ == '__main__':
                     html.Div(id="error", style={'color':'red'}),
                 ],
             ),
-
             ### Middle graph component
                 html.Div(
                     children=[
@@ -491,14 +463,14 @@ if __name__ == '__main__':
         )
     ])
 
-
+    ###### Callback for placeholder
     @app.callback(
         [dash.dependencies.Output(component_id='input', component_property='placeholder'),
         dash.dependencies.Output('input', 'value')],
         [dash.dependencies.Input(component_id='search_dropdown', component_property='value'),]
         )
     def update_mode_search(mode):
-        """Update the placeholder of the search box based on the drop-down options
+        """Update the placeholder of the search box based on the drop-down options & reset the input's value.
         """
         return mode, ""
 
@@ -522,11 +494,11 @@ if __name__ == '__main__':
     def process_graph(content, search_value, n_clicks, search_type, filepath,  G, pos):
         """ Update/rebuild the graph when the user picks a new file or searches something.
            Stores the graph and its nodes positions in an intermediary div.
-           This little maneuver greatly improves computational time.
+           This little maneuver greatly improves run-time.
 
         Arguments:
             content -- [The content of the uploaded file]
-            search_value -- [The value searched by the user. Single node, double nodes, paths]
+            search_value -- [The value searched by the user: nodes/paths]
             n_clicks -- [Number of times the button was clicked]
             filepath -- [Contains the file extension. Used to differentiate .txt from .p files]
         """
@@ -550,7 +522,6 @@ if __name__ == '__main__':
             pos = nx.nx_pydot.graphviz_layout(G, prog='neato')
             graph, _ = visualize_graph(G, pos)
             return graph, json.dumps(nx.readwrite.json_graph.node_link_data(G)), json.dumps(pos), {'display': 'none'}, ''
-
         else:
             try:
                 G = nx.readwrite.json_graph.node_link_graph(json.loads(G))
