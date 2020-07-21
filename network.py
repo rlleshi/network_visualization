@@ -43,7 +43,7 @@ def process_file(content, file_extension):
             edges.append(row)
         else:
             nodes.append(row)
-    return sorted(nodes), edges
+    return nodes, edges
 
 def rreplace(string, old, new, occurrence):
     """ Replace the last occurrences of a string starting from the end.
@@ -263,7 +263,7 @@ def visualize_graph(G, node_pos, search_value='', search_type='', highlighted=[]
     elif (len(highlighted)>0) & (search2):
         colorscale = [[0, 'rgba(41, 128, 185, 0.4)'], [0.1, 'rgba(0, 255, 0, 1)'],
                     [0.2, 'rgba(0, 255, 255, 1)'], [0.3, 'rgba(255, 255, 0, 1)'],
-                    [0.4, 'rgba(139, 69, 19, 1)'], [0.5, 'rgba(220, 20, 60, 1)'],
+                    [0.4, 'rgba(0, 0, 0, 1)'], [0.5, 'rgba(220, 20, 60, 1)'],
                     [1.0, 'rgba(192, 57, 43, 0.4)']]
     else:
         colorscale = [[0, 'rgba(41, 128, 185, 1)'], [1, 'rgba(192, 57, 43, 1)']]
@@ -342,20 +342,7 @@ def visualize_graph(G, node_pos, search_value='', search_type='', highlighted=[]
     layout = go.Layout(
         width = 1250,
         height = 600,
-        showlegend=True,
-        legend=dict(
-            x=0,
-            y=1,
-            traceorder="normal",
-            font=dict(
-                family="sans-serif",
-                size=12,
-                color="black"
-            ),
-            bgcolor="LightSteelBlue",
-            bordercolor="Black",
-            borderwidth=2),
-        legend_orientation='h',
+        showlegend=False,
         plot_bgcolor="rgb(255, 255, 250)",
         hovermode='closest',
         #clickmode='event+select',
@@ -516,10 +503,7 @@ if __name__ == '__main__':
             nodes, edges = process_file(decoded_content, file_extension)
             G = build_graph(nodes, edges)
 
-            # Calculate node positions
-            # Try out the following: sfdp; twopi; circo
-            # Additionally, you can try: dot, fdp. Though I didn't find these so good
-            pos = nx.nx_pydot.graphviz_layout(G, prog='neato')
+            pos = nx.nx_pydot.graphviz_layout(G)
             graph, _ = visualize_graph(G, pos)
             return graph, json.dumps(nx.readwrite.json_graph.node_link_data(G)), json.dumps(pos), {'display': 'none'}, ''
         else:
