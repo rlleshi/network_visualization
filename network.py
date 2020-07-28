@@ -9,6 +9,8 @@ import dash
 import dash_core_components as dcc
 import dash_html_components as html
 from itertools import product
+import gensim
+import multiprocessing
 
 ##################################################################################################################################
 # Docs on NetworkX: https://networkx.github.io/documentation/stable/index.html                                                   #
@@ -27,6 +29,14 @@ app.title = "FOL Network"
 global_paths=[]
 # Its very important to have a seed for graph stability considering the implementation
 random.seed(3)
+# NLP model. If the app will be used by multiple users, another solution has to be thought of
+NLP_MODEL = None
+
+def load_conceptnet_model(queue):
+    nlp_model = queue.get()
+    print('Loading the NLP model...')
+    nlp_model = gensim.models.KeyedVectors.load_word2vec_format('numberbatch-en-17.04b.txt', binary=False, unicode_errors='ignore')
+    queue.put(nlp_model)
 
 def process_file(content, file_extension):
     """ Process the file (.txt or .p) containing the graph and return its nodes and edges.
@@ -95,7 +105,7 @@ def unflatten(l, ind):
 
 def get_search_nodes(search, search_type, G):
     highlighted = []
-    search1, search2, search3 = False, False, False
+    search1, search2, search3, search4 = False, False, False, False
 
     if search_type == 'node,sKx':
         search1=True
@@ -103,6 +113,8 @@ def get_search_nodes(search, search_type, G):
         search2=True
     elif search_type == 'node1,node2':
         search3=True
+    elif search_type == 'word,n':
+        search4=True
 
     searched = search.partition(',')
     searched = [s.strip() for s in searched]
@@ -188,13 +200,22 @@ def get_search_nodes(search, search_type, G):
             if is_path:
                 highlighted.append(c_paths)
         global_paths = highlighted
+    else:
+        # Search 4
+        global NLP_MODEL
+        result = NLP_MODEL.most_similar(searched[0], topn=50)
+        result = [res[0] for res in result if G.has_node(res[0])]
+        if len(result) > int(searched[2]):
+            highlighted = result[:int(searched[2])]
+        else:
+            highlighted = result
 
     if len(highlighted) == 0:
-        return [], False, False, False
+        return [], False, False, False, False
     elif (type(highlighted[0]) is list) & (len(highlighted) > 0):
-        return highlighted[0], search1, search2, search3
+        return highlighted[0], search1, search2, search3, search4
     else:
-        return highlighted, search1, search2, search3
+        return highlighted, search1, search2, search3, search4
 
 def get_clicked_path(n_clicks, paths):
     return paths[n_clicks % len(paths)]
@@ -212,7 +233,7 @@ def visualize_graph(G, node_pos, search_value='', search_type='', highlighted=[]
 
     node_color = np.array([1.0 if node.find('sK')!=-1  else 0 for node in node_labels])
     error_message=""
-    search1, search2, search3 = False, False, False
+    search1, search2, search3, search4 = False, False, False, False
     highlighted_names=[] # Names of nodes highlighted, used for highlighting the corresponding edges
 
     # "Next Path" button search
@@ -230,7 +251,7 @@ def visualize_graph(G, node_pos, search_value='', search_type='', highlighted=[]
         # Reset any global paths
         global global_paths
         global_paths=[]
-        highlighted, search1, search2, search3 = get_search_nodes(search_value, search_type, G)
+        highlighted, search1, search2, search3, search4 = get_search_nodes(search_value, search_type, G)
 
         if len(highlighted)==0:
             error_message="The searched node/path does not exist or the input format is incorrect."
@@ -244,7 +265,7 @@ def visualize_graph(G, node_pos, search_value='', search_type='', highlighted=[]
                         node_color[highlighted[i]] = 0.3
                     else:
                         node_color[highlighted[i]] = 0.5
-            elif search2: # Node search
+            elif (search2) | (search4): # Node search
                 val = 0
                 for i in range(len(highlighted)):
                     val+=0.1
@@ -260,7 +281,7 @@ def visualize_graph(G, node_pos, search_value='', search_type='', highlighted=[]
     elif (len(highlighted)>0) & (search3):
         colorscale = [[0, 'rgba(41, 128, 185, 0.4)'], [0.5, 'rgba(0, 255, 0, 1)'],
                     [1.0, 'rgba(192, 57, 43, 0.4)']]
-    elif (len(highlighted)>0) & (search2):
+    elif (len(highlighted)>0) & ((search2) | (search4)):
         colorscale = [[0, 'rgba(41, 128, 185, 0.4)'], [0.1, 'rgba(0, 255, 0, 1)'],
                     [0.2, 'rgba(0, 255, 255, 1)'], [0.3, 'rgba(255, 255, 0, 1)'],
                     [0.4, 'rgba(0, 0, 0, 1)'], [0.5, 'rgba(220, 20, 60, 1)'],
@@ -357,6 +378,8 @@ def visualize_graph(G, node_pos, search_value='', search_type='', highlighted=[]
 
 
 if __name__ == '__main__':
+    # Load the model in parallel
+
     # Initialize the graph with no data
     fig = go.Figure(data=None, layout = go.Layout(
                 width = 1250,
@@ -411,7 +434,8 @@ if __name__ == '__main__':
                                 options=[
                                     {'label':'node-sk', 'value': 'node,sKx'},
                                     {'label':'single node', 'value': 'node(s)'},
-                                    {'label':'paths', 'value':'node1,node2'}
+                                    {'label':'paths', 'value':'node1,node2'},
+                                    {'label':'similarity', 'value':'word,n'}
                                 ],
                                 value='node,sKx',
                                 placeholder='Select a search mode',
@@ -419,7 +443,7 @@ if __name__ == '__main__':
                             ),
                             dcc.Markdown("**Select search mode**")
                         ],
-                        style={'width':'25%', 'display':'inline-block'},
+                        style={'width':'20%', 'display':'inline-block'},
                     ),
                     html.Div(
                         children=[
@@ -427,14 +451,20 @@ if __name__ == '__main__':
                                     debounce=True),
                             dcc.Markdown("**Search Node(s)/Paths**")
                         ],
-                        style={'width':'45%', 'display':'inline-block'},
+                        style={'width':'40%', 'display':'inline-block'},
                     ),
                     ### Button for graph paths
                     html.Div(
                         html.Button('Next Path', id='next-path-btn', n_clicks=0, hidden=True),
-                        style={'width':'30%', 'display':'inline-block'}
+                        style={'width':'20%', 'display':'inline-block'}
+                    ),
+                    ### Button for enabling model loading
+                    html.Div(
+                        html.Button('Load NLP model', id='nlp_button', n_clicks=0),
+                        style={'width':'20%', 'display':'inline-block'}
                     ),
                     html.Div(id="error", style={'color':'red'}),
+                    html.Div(id='nlp_message', style={'color':'blue'}),
                 ],
             ),
             ### Middle graph component
@@ -450,16 +480,54 @@ if __name__ == '__main__':
         )
     ])
 
+    # Possibility: You you return from the model that loads the message "model loaded"
+    # This message you return from the callback
+    @app.callback(
+        [dash.dependencies.Output(component_id='nlp_button', component_property='style'),],
+        [dash.dependencies.Input(component_id='nlp_button', component_property='n_clicks'),]
+    )
+    def load_nlp_model(n_clicks):
+        if n_clicks == 1:
+            print('Button clicked!')
+            # p = multiprocessing.Process(target=load_conceptnet_model)
+            # p.start()
+            # p.join()
+            ###
+            # pool = multiprocessing.Pool()
+            # nlp_model = pool.apply_async(load_conceptnet_model)
+            # print('Loaded model')
+            # print(type(nlp_model))
+            global NLP_MODEL
+            queue = multiprocessing.Queue()
+            queue.put(NLP_MODEL)
+            p = multiprocessing.Process(target=load_conceptnet_model, args=(queue,))
+            p.start()
+            p.join()
+            NLP_MODEL = queue.get()
+            print('Finished loading model')
+            print(type(NLP_MODEL))
+            return [{'display': 'none'}]
+        return [{'display':'block'}]
+
     ###### Callback for placeholder
     @app.callback(
         [dash.dependencies.Output(component_id='input', component_property='placeholder'),
-        dash.dependencies.Output('input', 'value')],
+        dash.dependencies.Output('input', 'value'),
+        dash.dependencies.Output('input', 'disabled'),
+        dash.dependencies.Output('nlp_message', 'children')],
         [dash.dependencies.Input(component_id='search_dropdown', component_property='value'),]
         )
     def update_mode_search(mode):
         """Update the placeholder of the search box based on the drop-down options & reset the input's value.
         """
-        return mode, ""
+        # global nlp_model
+        if (mode == 'word,n') & (NLP_MODEL == None):
+            print('Type of model', type(NLP_MODEL))
+            return mode, '', True, 'Model not loaded'
+        elif (mode=='word,n') & (NLP_MODEL != None):
+            print('Type of model', type(NLP_MODEL))
+            return mode, '', False, 'Model loaded'
+        return mode, '', False, ''
 
     ###### Callback for all components
     @app.callback(
