@@ -106,8 +106,7 @@ def unflatten(l, ind):
         s = ind[i]+1
     return u_l
 
-def get_search_nodes(search, search_type, G):
-    highlighted = []
+def get_search_type(search_type):
     search1, search2, search3, search4 = False, False, False, False
 
     if search_type == 'node,sKx':
@@ -118,7 +117,12 @@ def get_search_nodes(search, search_type, G):
         search3=True
     elif search_type == 'word,n':
         search4=True
+    return search1, search2, search3, search4
 
+
+def get_search_nodes(search, search_type, G):
+    highlighted = []
+    search1, search2, search3, search4 = get_search_type(search_type)
     searched = search.partition(',')
     searched = [s.strip() for s in searched]
 
@@ -158,7 +162,7 @@ def get_search_nodes(search, search_type, G):
             rest = rest.split(',')
             for search in rest:
                 for node in G.nodes:
-                    if node.lstrip(" ").rstrip(" ") == search:
+                    if node.lstrip(" ").rstrip(" ") == search.strip():
                         highlighted.append(node)
 
     elif search3:
