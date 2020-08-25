@@ -19,6 +19,10 @@ import multiprocessing
 #                                                                                                                                #
 # Docs on Plotly: https://plotly.com/python/network-graphs/                                                                      #
 #                 https://plotly.com/python/reference/                                                                           #
+#                                                                                                                                #
+# Docs on Genism: https://radimrehurek.com/gensim/models/keyedvectors.html                                                       #
+#                                                                                                                                #
+# ConceptNet Numberbatch: https://github.com/commonsense/conceptnet-numberbatch                                                  #
 ##################################################################################################################################
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
@@ -32,11 +36,10 @@ random.seed(3)
 # NLP model. If the app will be used by multiple users, another solution has to be thought of
 NLP_MODEL = None
 
-def load_conceptnet_model(queue):
-    nlp_model = queue.get()
+def load_conceptnet_model(result):
     print('Loading the NLP model...')
-    nlp_model = gensim.models.KeyedVectors.load_word2vec_format('numberbatch-en-17.04b.txt', binary=False, unicode_errors='ignore')
-    queue.put(nlp_model)
+    nlp = gensim.models.KeyedVectors.load_word2vec_format('numberbatch-en-17.04b.txt', binary=False, unicode_errors='ignore')
+    result.append(nlp)
 
 def process_file(content, file_extension):
     """ Process the file (.txt or .p) containing the graph and return its nodes and edges.
@@ -200,15 +203,15 @@ def get_search_nodes(search, search_type, G):
             if is_path:
                 highlighted.append(c_paths)
         global_paths = highlighted
-    else:
-        # Search 4
-        global NLP_MODEL
-        result = NLP_MODEL.most_similar(searched[0], topn=50)
-        result = [res[0] for res in result if G.has_node(res[0])]
-        if len(result) > int(searched[2]):
-            highlighted = result[:int(searched[2])]
-        else:
-            highlighted = result
+    elif search4:
+        #global NLP_MODEL # Can comment this out?
+        if searched[2].isdigit(): # problem here
+            result = NLP_MODEL.most_similar(searched[0], topn=50)
+            result = [res[0] for res in result if G.has_node(res[0])]
+            if len(result) > int(searched[2]):
+                highlighted = result[:int(searched[2])]
+            else:
+                highlighted = result
 
     if len(highlighted) == 0:
         return [], False, False, False, False
@@ -254,7 +257,7 @@ def visualize_graph(G, node_pos, search_value='', search_type='', highlighted=[]
         highlighted, search1, search2, search3, search4 = get_search_nodes(search_value, search_type, G)
 
         if len(highlighted)==0:
-            error_message="The searched node/path does not exist or the input format is incorrect."
+            error_message="The searched node/path/similarity does not exist or the input format is incorrect."
         else:
             highlighted_names = highlighted
             Gnodes = np.array(G.nodes)
@@ -488,25 +491,17 @@ if __name__ == '__main__':
     )
     def load_nlp_model(n_clicks):
         if n_clicks == 1:
-            print('Button clicked!')
-            # p = multiprocessing.Process(target=load_conceptnet_model)
-            # p.start()
-            # p.join()
-            ###
-            # pool = multiprocessing.Pool()
-            # nlp_model = pool.apply_async(load_conceptnet_model)
-            # print('Loaded model')
-            # print(type(nlp_model))
-            global NLP_MODEL
-            queue = multiprocessing.Queue()
-            queue.put(NLP_MODEL)
-            p = multiprocessing.Process(target=load_conceptnet_model, args=(queue,))
+            manager = multiprocessing.Manager()
+            result = manager.list()
+            p = multiprocessing.Process(target=load_conceptnet_model, args=(result,))
             p.start()
             p.join()
-            NLP_MODEL = queue.get()
-            print('Finished loading model')
-            print(type(NLP_MODEL))
+            global NLP_MODEL
+            NLP_MODEL = result[0]
+            print('Model fully integrated')
             return [{'display': 'none'}]
+        elif n_clicks > 1: # Get rid of this condition here
+            return[{'display':'none'}]
         return [{'display':'block'}]
 
     ###### Callback for placeholder
@@ -520,12 +515,9 @@ if __name__ == '__main__':
     def update_mode_search(mode):
         """Update the placeholder of the search box based on the drop-down options & reset the input's value.
         """
-        # global nlp_model
         if (mode == 'word,n') & (NLP_MODEL == None):
-            print('Type of model', type(NLP_MODEL))
             return mode, '', True, 'Model not loaded'
         elif (mode=='word,n') & (NLP_MODEL != None):
-            print('Type of model', type(NLP_MODEL))
             return mode, '', False, 'Model loaded'
         return mode, '', False, ''
 
