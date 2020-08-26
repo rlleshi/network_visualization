@@ -119,7 +119,6 @@ def get_search_type(search_type):
         search4=True
     return search1, search2, search3, search4
 
-
 def get_search_nodes(search, search_type, G):
     highlighted = []
     search1, search2, search3, search4 = get_search_type(search_type)
@@ -263,19 +262,24 @@ def visualize_graph(G, node_pos, search_value='', search_type='', highlighted=[]
         if len(highlighted)==0:
             error_message="The searched node/path/similarity does not exist or the input format is incorrect."
         else:
+            # Convert to indices
             highlighted_names = highlighted
             Gnodes = np.array(G.nodes)
             highlighted = [int(np.where(Gnodes==node)[0]) for node in highlighted]
+
             if search1: # Node,sK search
                 for i in range(len(highlighted)):
                     if i<len(highlighted)-1:
                         node_color[highlighted[i]] = 0.3
                     else:
                         node_color[highlighted[i]] = 0.5
-            elif (search2) | (search4): # Node search
+            elif (search2) | (search4):
                 val = 0
                 for i in range(len(highlighted)):
-                    val+=0.1
+                    if i == 0:
+                        val += 0.1
+                    elif highlighted_names[i-1].strip() != highlighted_names[i].strip():
+                        val+=0.1
                     node_color[highlighted[i]] = val
             else: # Path search
                 for i in range(len(highlighted)):
