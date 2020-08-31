@@ -38,7 +38,7 @@ NLP_MODEL = None
 
 def load_conceptnet_model(result):
     print('Loading the NLP model...')
-    nlp = gensim.models.KeyedVectors.load_word2vec_format('numberbatch-en-17.04b.txt', binary=False, unicode_errors='ignore')
+    nlp = gensim.models.KeyedVectors.load('conceptNet', mmap='r')
     result.append(nlp)
 
 def process_file(content, file_extension):
