@@ -409,13 +409,10 @@ if __name__ == '__main__':
 
     app.layout = html.Div([
         ### Title
-        html.Div([html.H1("First-order Logic Network Graph")],
-                className="row",
-                style={'textAlign': "center"}
-        ),
+        html.Div([html.H1("First-order Logic Network Graph")], style={'textAlign': "center"}),
+
         ### Define the components
         html.Div(
-            className="row",
             children=[
             ### Top Upload component
             html.Div(
@@ -474,7 +471,12 @@ if __name__ == '__main__':
                     ),
                     ### Button for enabling model loading
                     html.Div(
-                        html.Button('Load NLP model', id='nlp_button', n_clicks=0),
+                        dcc.Loading(
+                            children=[html.Div(
+                                html.Button('Load NLP model', id='nlp_button', n_clicks=0),
+                            )],
+                            type='circle',
+                        ),
                         style={'width':'20%', 'display':'inline-block'}
                     ),
                     html.Div(id="error", style={'color':'red'}),
@@ -604,5 +606,6 @@ if __name__ == '__main__':
             else:
                 raise dash.exceptions.PreventUpdate
 
+    # app.run_server(debug=True, threaded=True)
     app.run_server(debug=True, use_reloader=False,dev_tools_hot_reload=True)
     # app.run_server(debug=True,dev_tools_ui=False,dev_tools_props_check=False)
