@@ -38,8 +38,11 @@ NLP_MODEL = None
 
 def load_conceptnet_model(result):
     print('Loading the NLP model...')
-    nlp = gensim.models.KeyedVectors.load('conceptNet', mmap='r')
-    result.append(nlp)
+    try:
+        nlp = gensim.models.KeyedVectors.load('conceptNet', mmap='r')
+        result.append(nlp)
+    except FileNotFoundError:
+        print('Make sure you have already converted the numberbatch model using the converter script.')
 
 def process_file(content, file_extension):
     """ Process the file (.txt or .p) containing the graph and return its nodes and edges.
@@ -505,8 +508,11 @@ if __name__ == '__main__':
             p.start()
             p.join()
             global NLP_MODEL
-            NLP_MODEL = result[0]
-            print('Model fully integrated')
+            try:
+                NLP_MODEL = result[0]
+                print('Model fully integrated')
+            except IndexError:
+                print('Model not integrated. Please check the above message.')
             return [{'display': 'none'}]
         elif n_clicks > 1: # Get rid of this condition here
             return[{'display':'none'}]
