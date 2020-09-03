@@ -414,14 +414,24 @@ if __name__ == '__main__':
         ### Define the components
         html.Div(
             children=[
-            ### Top Upload component
+            ### Button for enabling model loading
+            html.Div(
+                dcc.Loading(
+                    children=[html.Div(
+                        html.Button('Load NLP model', id='nlp_button', n_clicks=0),
+                        style={'display':'inline-block'},
+                        )],
+                    type='circle',
+                ),
+                style={'text-align': 'center', 'margin-bottom': '10px'},
+            ),
+
+            ### Two upload components
             html.Div(
                 dcc.Upload(
                     id='upload-data',
-                    children=html.Div([
-                        'Drag and Drop or ',
-                        html.A('Select Files')
-                    ]),
+                    disabled=True,
+                    children=html.Div(['Drag and Drop or ', html.A('Select Files')]),
                     style={
                         'display': 'inline-block',
                         'width': '30%',
@@ -435,11 +445,26 @@ if __name__ == '__main__':
                 ),
                 style={'text-align': 'center', 'margin-bottom':'10px'}
             ),
-            ### Top components (below upload)
+            ### Components
             html.Div(
                 children=[
+                    # Model choices
+                    html.Div(
+                        dcc.RadioItems(
+                            options=[
+                                {'label': '1st Model', 'value': 'model1'},
+                                {'label': '2nd Model', 'value': 'model2'}
+                            ],
+                            id='model_selector',
+                            persistence=True,
+                            persistence_type='session'
+                        ),
+                        style={'width': '20%', 'display': 'inline-block'}
+                    ),
+                    # Search Type dropdown
                     html.Div(
                         children=[
+                            dcc.Markdown("**Select search mode**"),
                             dcc.Dropdown(
                                 id='search_dropdown',
                                 options=[
@@ -448,49 +473,40 @@ if __name__ == '__main__':
                                     {'label':'paths', 'value':'node1,node2'},
                                     {'label':'similarity', 'value':'word,n'}
                                 ],
+                                disabled=True,
                                 value='node,sKx',
-                                placeholder='Select a search mode',
-                                style={'margin-top':'-37px'}
-                            ),
-                            dcc.Markdown("**Select search mode**")
+                                # style={'margin-top':'-37px'}
+                            )
                         ],
-                        style={'width':'20%', 'display':'inline-block'},
+                        style={'width':'20%', 'display':'inline-block', 'margin': '10px'},
                     ),
+                    # Search input
                     html.Div(
                         children=[
-                            dcc.Input(id='input', type='text', placeholder='node/paths', value='',
-                                    debounce=True),
-                            dcc.Markdown("**Search Node(s)/Paths**")
+                            dcc.Markdown("**Search Node(s)/Paths**"),
+                            dcc.Input(id='input', type='text', disabled=True, value='', debounce=True),
                         ],
-                        style={'width':'40%', 'display':'inline-block'},
+                        style={'width':'20%', 'display':'inline-block'},
                     ),
                     ### Button for graph paths
                     html.Div(
                         html.Button('Next Path', id='next-path-btn', n_clicks=0, hidden=True),
                         style={'width':'20%', 'display':'inline-block'}
                     ),
-                    ### Button for enabling model loading
-                    html.Div(
-                        dcc.Loading(
-                            children=[html.Div(
-                                html.Button('Load NLP model', id='nlp_button', n_clicks=0),
-                            )],
-                            type='circle',
-                        ),
-                        style={'width':'20%', 'display':'inline-block'}
-                    ),
                     html.Div(id="error", style={'color':'red'}),
                     html.Div(id='nlp_message', style={'color':'blue'}),
                 ],
+                style = {'border': '1px dashed #6A618F'}
             ),
             ### Middle graph component
                 html.Div(
                     children=[
                         dcc.Graph(id='fol-graph', figure=fig),
                         # Store the graph node positions here between callbacks
+                        # replace with dcc.store
                         html.Div(id='graph-pos-intermediary', style={'display':'none'}),
                         html.Div(id='graph-intermediary', style={'display':'none'}),
-                        ]
+                    ]
                 ),
             ]
         )
@@ -520,22 +536,25 @@ if __name__ == '__main__':
             return[{'display':'none'}]
         return [{'display':'block'}]
 
+    @app.callback(
+        [dash.dependencies.Output('input', 'disabled'),
+         dash.dependencies.Output('search_dropdown', 'disabled')],
+        [dash.dependencies.Input('model_selector', 'value')]
+    )
+    def enable_searches(model_selector):
+        if model_selector == None:
+            return True, True
+        return False, False
+
     ###### Callback for placeholder
     @app.callback(
         [dash.dependencies.Output(component_id='input', component_property='placeholder'),
-        dash.dependencies.Output('input', 'value'),
-        dash.dependencies.Output('input', 'disabled'),
-        dash.dependencies.Output('nlp_message', 'children')],
+        dash.dependencies.Output('input', 'value')],
         [dash.dependencies.Input(component_id='search_dropdown', component_property='value'),]
         )
     def update_mode_search(mode):
-        """Update the placeholder of the search box based on the drop-down options & reset the input's value.
-        """
-        if (mode == 'word,n') & (NLP_MODEL == None):
-            return mode, '', True, 'Model not loaded'
-        elif (mode=='word,n') & (NLP_MODEL != None):
-            return mode, '', False, 'Model loaded'
-        return mode, '', False, ''
+        """ Update the placeholder of the search box based on the drop-down options & reset the input's value. """
+        return mode, ''
 
     ###### Callback for all components
     @app.callback(
