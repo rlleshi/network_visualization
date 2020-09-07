@@ -5,10 +5,10 @@ import networkx as nx
 import json
 import plotly.graph_objs as go
 from textwrap import dedent as d
+from itertools import product
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
-from itertools import product
 import gensim
 import multiprocessing
 
@@ -29,11 +29,10 @@ external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 app.title = "FOL Network"
 
-# If the app will be used by multiple users, for storing paths in a global variables should be reconsidered
+# If the app will be used by multiple users, storing the paths in a global variables should be reconsidered
 global_paths=[]
 # Its very important to have a seed for graph stability considering the implementation
 random.seed(3)
-# NLP model. If the app will be used by multiple users, another solution has to be thought of
 NLP_MODEL = None
 
 def load_conceptnet_model(result):
@@ -392,29 +391,27 @@ def visualize_graph(G, node_pos, search_value='', search_type='', highlighted=[]
 
 
 if __name__ == '__main__':
-    # Load the model in parallel
-
     # Initialize the graph with no data
     fig = go.Figure(data=None, layout = go.Layout(
-                width = 1250,
-                height = 600,
-                showlegend=False,
-                plot_bgcolor="rgb(255, 255, 250)",
-                hovermode='closest',
-                margin=dict(b=20,l=5,r=5,t=40),
-                annotations=None,
-                xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False)
+        width = 1250,
+        height = 600,
+        showlegend=False,
+        plot_bgcolor="rgb(255, 255, 250)",
+        hovermode='closest',
+        margin=dict(b=20,l=5,r=5,t=40),
+        annotations=None,
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False)
     ))
 
     app.layout = html.Div([
         ### Title
-        html.Div([html.H1("First-order Logic Network Graph")], style={'textAlign': "center"}),
+        html.Div([html.H1("First-order Logic Network Graph")], style={'text-align': "center"}),
 
         ### Define the components
         html.Div(
             children=[
-            ### Button for enabling model loading
+            ### Button to load model
             html.Div(
                 dcc.Loading(
                     children=[html.Div(
@@ -443,7 +440,7 @@ if __name__ == '__main__':
                         'textAlign': 'center',
                     },
                 ),
-                style={'text-align': 'center', 'margin-bottom':'10px'}
+                style={'text-align': 'center', 'margin-bottom':'10px',}
             ),
             ### Components
             html.Div(
@@ -459,12 +456,10 @@ if __name__ == '__main__':
                             persistence=True,
                             persistence_type='session'
                         ),
-                        style={'width': '20%', 'display': 'inline-block'}
+                        style={'width': '20%', 'display': 'inline-block', 'margin-top': '-50px'}
                     ),
-                    # Search Type dropdown
                     html.Div(
                         children=[
-                            dcc.Markdown("**Select search mode**"),
                             dcc.Dropdown(
                                 id='search_dropdown',
                                 options=[
@@ -475,39 +470,38 @@ if __name__ == '__main__':
                                 ],
                                 disabled=True,
                                 value='node,sKx',
-                                # style={'margin-top':'-37px'}
-                            )
+                            ),
+                            dcc.Markdown("**Search type**", style={'text-align': 'center'})
                         ],
-                        style={'width':'20%', 'display':'inline-block', 'margin': '10px'},
+                        style={'width':'20%', 'display':'inline-block', 'margin': '20px'},
                     ),
                     # Search input
                     html.Div(
                         children=[
-                            dcc.Markdown("**Search Node(s)/Paths**"),
                             dcc.Input(id='input', type='text', disabled=True, value='', debounce=True),
+                            dcc.Markdown("**Search**", style={'text-align': 'center'})
                         ],
                         style={'width':'20%', 'display':'inline-block'},
-                    ),
-                    ### Button for graph paths
-                    html.Div(
-                        html.Button('Next Path', id='next-path-btn', n_clicks=0, hidden=True),
-                        style={'width':'20%', 'display':'inline-block'}
                     ),
                     html.Div(id="error", style={'color':'red'}),
                     html.Div(id='nlp_message', style={'color':'blue'}),
                 ],
-                style = {'border': '1px dashed #6A618F'}
+                style = {'border': '1px dashed #6A618F', 'text-align': 'center'}
+            ),
+            ### Button for graph paths
+            html.Div(
+                html.Button('Next Path', id='next-path-btn', n_clicks=0, hidden=True),
+                style={'text-align': 'center', 'margin-top': '10px'}
             ),
             ### Middle graph component
-                html.Div(
-                    children=[
-                        dcc.Graph(id='fol-graph', figure=fig),
-                        # Store the graph node positions here between callbacks
-                        # replace with dcc.store
-                        html.Div(id='graph-pos-intermediary', style={'display':'none'}),
-                        html.Div(id='graph-intermediary', style={'display':'none'}),
-                    ]
-                ),
+            html.Div(
+                children=[
+                    dcc.Graph(id='fol-graph', figure=fig),
+                    # Store the graph node positions here between callbacks
+                    # replace with dcc.store
+                    html.Div(id='graph-pos-intermediary', style={'display':'none'}),
+                    html.Div(id='graph-intermediary', style={'display':'none'}),
+                ]),
             ]
         )
     ])
