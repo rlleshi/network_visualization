@@ -392,11 +392,23 @@ def visualize_graph(G, node_pos, search_value='', search_type='', highlighted=[]
 
 if __name__ == '__main__':
     # Initialize the graph with no data
-    fig = go.Figure(data=None, layout = go.Layout(
-        width = 1250,
-        height = 600,
+    fig1 = go.Figure(data=None, layout = go.Layout(
+        width = 620,
+        height = 550,
         showlegend=False,
-        plot_bgcolor="rgb(255, 255, 250)",
+        plot_bgcolor="rgb(255, 255, 245)",
+        hovermode='closest',
+        margin=dict(b=20,l=5,r=5,t=40),
+        annotations=None,
+        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False)
+    ))
+
+    fig2 = go.Figure(data=None, layout = go.Layout(
+        width = 620,
+        height = 550,
+        showlegend=False,
+        plot_bgcolor="rgb(255, 255, 245)",
         hovermode='closest',
         margin=dict(b=20,l=5,r=5,t=40),
         annotations=None,
@@ -414,10 +426,12 @@ if __name__ == '__main__':
             ### Button to load model
             html.Div(
                 dcc.Loading(
-                    children=[html.Div(
-                        html.Button('Load NLP model', id='nlp_button', n_clicks=0),
-                        style={'display':'inline-block'},
-                        )],
+                    children=[
+                        html.Div(
+                            html.Button('Load NLP model', id='nlp_button', n_clicks=0),
+                            style={'display':'inline-block'}
+                        )
+                    ],
                     type='circle',
                 ),
                 style={'text-align': 'center', 'margin-bottom': '10px'},
@@ -440,7 +454,7 @@ if __name__ == '__main__':
                         'textAlign': 'center',
                     },
                 ),
-                style={'text-align': 'center', 'margin-bottom':'10px',}
+                style={'text-align': 'center', 'margin-bottom':'10px'}
             ),
             ### Components
             html.Div(
@@ -456,7 +470,7 @@ if __name__ == '__main__':
                             persistence=True,
                             persistence_type='session'
                         ),
-                        style={'width': '20%', 'display': 'inline-block', 'margin-top': '-50px'}
+                        style={'width': '20%', 'display': 'inline-block'}
                     ),
                     html.Div(
                         children=[
@@ -481,7 +495,7 @@ if __name__ == '__main__':
                             dcc.Input(id='input', type='text', disabled=True, value='', debounce=True),
                             dcc.Markdown("**Search**", style={'text-align': 'center'})
                         ],
-                        style={'width':'20%', 'display':'inline-block'},
+                        style={'width':'20%', 'display':'inline-block', 'margin': '20px'},
                     ),
                     html.Div(id="error", style={'color':'red'}),
                     html.Div(id='nlp_message', style={'color':'blue'}),
@@ -496,18 +510,18 @@ if __name__ == '__main__':
             ### Middle graph component
             html.Div(
                 children=[
-                    dcc.Graph(id='fol-graph', figure=fig),
+                    html.Div(dcc.Graph(id='fol-graph1', figure=fig1, style={'width': '40%'}), style={'display': 'inline-block'}),
+                    html.Div(dcc.Graph(id='fol-graph2', figure=fig2, style={'width': '40%'}), style={'display': 'inline-block'}),
                     # Store the graph node positions here between callbacks
                     # replace with dcc.store
                     html.Div(id='graph-pos-intermediary', style={'display':'none'}),
                     html.Div(id='graph-intermediary', style={'display':'none'}),
-                ]),
+                ],
+                style={'display': 'inline-block'}),
             ]
         )
     ])
 
-    # Possibility: You you return from the model that loads the message "model loaded"
-    # This message you return from the callback
     @app.callback(
         [dash.dependencies.Output(component_id='nlp_button', component_property='style'),],
         [dash.dependencies.Input(component_id='nlp_button', component_property='n_clicks'),]
@@ -552,7 +566,7 @@ if __name__ == '__main__':
 
     ###### Callback for all components
     @app.callback(
-        [dash.dependencies.Output(component_id='fol-graph', component_property='figure'),
+        [dash.dependencies.Output(component_id='fol-graph1', component_property='figure'),
         dash.dependencies.Output('graph-intermediary', 'children'),
         dash.dependencies.Output('graph-pos-intermediary', 'children'),
         dash.dependencies.Output('next-path-btn', 'style'),
