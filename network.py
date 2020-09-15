@@ -2,6 +2,7 @@ import random
 import base64
 import numpy as np
 import networkx as nx
+from networkx.readwrite.json_graph import node_link_graph, node_link_data
 import json
 import plotly.graph_objs as go
 from textwrap import dedent as d
@@ -9,6 +10,7 @@ from itertools import product
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
+from dash.dependencies import Input, Output, State
 import gensim
 import multiprocessing
 
@@ -374,8 +376,8 @@ def visualize_graph(G, node_pos, search_value='', search_type='', highlighted=[]
 
     data = edge_trace +[node_trace]
     layout = go.Layout(
-        width = 1250,
-        height = 600,
+        width = 620,
+        height = 550,
         showlegend=False,
         plot_bgcolor="rgb(255, 255, 250)",
         hovermode='closest',
@@ -516,12 +518,15 @@ if __name__ == '__main__':
                     # replace with dcc.store
                     html.Div(id='graph-pos-intermediary', style={'display':'none'}),
                     html.Div(id='graph-intermediary', style={'display':'none'}),
+                    html.Div(id='graph-pos-intermediary2', style={'display':'none'}),
+                    html.Div(id='graph-intermediary2', style={'display':'none'}),
                 ],
                 style={'display': 'inline-block'}),
             ]
         )
     ])
 
+    ### Callback for loading the model
     @app.callback(
         [dash.dependencies.Output(component_id='nlp_button', component_property='style'),],
         [dash.dependencies.Input(component_id='nlp_button', component_property='n_clicks'),]
@@ -545,43 +550,50 @@ if __name__ == '__main__':
         return [{'display':'block'}]
 
     @app.callback(
-        [dash.dependencies.Output('input', 'disabled'),
-         dash.dependencies.Output('search_dropdown', 'disabled')],
-        [dash.dependencies.Input('model_selector', 'value')]
+        [Output('input', 'disabled'),
+         Output('search_dropdown', 'disabled'),
+         Output('upload-data', 'disabled')],
+        [Input('model_selector', 'value')]
     )
-    def enable_searches(model_selector):
-        if model_selector == None:
-            return True, True
-        return False, False
+    def enable_searches(model_selector_value):
+        if None == model_selector_value:
+            return True, True, True
+        return False, False, False
 
     ###### Callback for placeholder
     @app.callback(
-        [dash.dependencies.Output(component_id='input', component_property='placeholder'),
-        dash.dependencies.Output('input', 'value')],
-        [dash.dependencies.Input(component_id='search_dropdown', component_property='value'),]
+        [Output(component_id='input', component_property='placeholder'),
+         Output('input', 'value')],
+        [Input(component_id='search_dropdown', component_property='value')]
         )
     def update_mode_search(mode):
         """ Update the placeholder of the search box based on the drop-down options & reset the input's value. """
         return mode, ''
 
-    ###### Callback for all components
+    ###### Main callback
     @app.callback(
         [dash.dependencies.Output(component_id='fol-graph1', component_property='figure'),
+        Output('fol-graph2', 'figure'),
         dash.dependencies.Output('graph-intermediary', 'children'),
         dash.dependencies.Output('graph-pos-intermediary', 'children'),
+        dash.dependencies.Output('graph-intermediary2', 'children'),
+        dash.dependencies.Output('graph-pos-intermediary2', 'children'),
         dash.dependencies.Output('next-path-btn', 'style'),
         dash.dependencies.Output('error', 'children')],
 
         [dash.dependencies.Input(component_id='upload-data', component_property='contents'),
+        Input('model_selector', 'value'),
         dash.dependencies.Input('input', 'value'),
         dash.dependencies.Input('next-path-btn', 'n_clicks'),
         dash.dependencies.Input(component_id='search_dropdown', component_property='value')],
 
         [dash.dependencies.State(component_id='upload-data', component_property='filename'),
         dash.dependencies.State('graph-intermediary', 'children'),
-        dash.dependencies.State('graph-pos-intermediary', 'children'),]
+        dash.dependencies.State('graph-pos-intermediary', 'children'),
+        State('graph-intermediary2', 'children'),
+        State('graph-pos-intermediary2', 'children'),]
     )
-    def process_graph(content, search_value, n_clicks, search_type, filepath,  G, pos):
+    def process_graph(content, model, search_value, n_clicks, search_type, filepath,  G1, pos1, G2, pos2):
         """ Update/rebuild the graph when the user picks a new file or searches something.
            Stores the graph and its nodes positions in an intermediary div.
            This little maneuver greatly improves run-time.
@@ -590,7 +602,10 @@ if __name__ == '__main__':
             content -- [The content of the uploaded file]
             search_value -- [The value searched by the user: nodes/paths]
             n_clicks -- [Number of times the button was clicked]
+            model -- [Whether the user wants to perform the first 4 searches on the first or second model]
             filepath -- [Contains the file extension. Used to differentiate .txt from .p files]
+            G -- [The graph in json format]
+            pos -- [The position of nodes in json format]
         """
         ctx = dash.callback_context
         component_name = ctx.triggered[0]['prop_id'].split('.')[0]
@@ -598,22 +613,50 @@ if __name__ == '__main__':
 
         if (component_value == None) | (component_value == 0):
             raise dash.exceptions.PreventUpdate
+
         if component_name == 'upload-data':
             content = content.split(',')[1]
             decoded_content = base64.b64decode(content).decode('utf-8')
             file_extension = filepath.split(".")[1]
+            print('Model', model)
+            if model == 'model1':
+                # check if the other model already exists
+                try:
+                    G2 = node_link_graph(json.loads(G2))
+                    pos2 = json.loads(pos2)
+                    graph2, _ = visualize_graph(G2, pos2)
+                except TypeError:
+                    G2 = nx.Graph()
+                    pos2 = None
+                    graph2 = fig2
+                    print("ValueError for model2")
+            else:
+                try:
+                    G1 = node_link_graph(json.loads(G1))
+                    pos1 = json.loads(pos1)
+                    graph1, _ = visualize_graph(G1, pos1)
+                except TypeError:
+                    G1 = nx.Graph()
+                    pos1 = None
+                    graph1 = fig1
+                    print("ValueError for model1")
 
+            # Build new graph
             nodes, edges = process_file(decoded_content, file_extension)
             G = build_graph(nodes, edges)
-
             pos = nx.nx_pydot.graphviz_layout(G)
             graph, _ = visualize_graph(G, pos)
-            return graph, json.dumps(nx.readwrite.json_graph.node_link_data(G)), json.dumps(pos), {'display': 'none'}, ''
+
+            if model == 'model1':
+                return graph, graph2, json.dumps(node_link_data(G)), json.dumps(pos), json.dumps(node_link_data(G2)), json.dumps(pos2), {'display': 'none'}, ''
+            else:
+                return graph1, graph, json.dumps(node_link_data(G1)), json.dumps(pos1), json.dumps(node_link_data(G)), json.dumps(pos), {'display': 'none'}, ''
+
         else:
             try:
                 G = nx.readwrite.json_graph.node_link_graph(json.loads(G))
                 pos = json.loads(pos)
-            except TypeError:
+            except (TypeError, UnboundLocalError):
                 raise dash.exceptions.PreventUpdate
             global global_paths
 
