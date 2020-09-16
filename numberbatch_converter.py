@@ -15,5 +15,3 @@ if __name__ == '__main__':
         print('Incorrect file path. Please open the code and modify the PATH variable.')
     except ValueError:
         print('The provided file is not a gensim model.')
-
-    print('Conversion failed.')
