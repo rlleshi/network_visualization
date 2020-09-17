@@ -32,13 +32,15 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 app.title = "FOL Network"
 
 # If the app will be used by multiple users, storing the paths in a global variables should be reconsidered
-global_paths=[]
-# Its very important to have a seed for graph stability considering the implementation
+GLOBAL_PATHS=[]
+# Its very important to have a seed for graph stability considering the implementation otherwise we get a different kind of graph
+# at every built
 random.seed(3)
 NLP_MODEL = None
 
 def load_conceptnet_model(result):
-    print('Loading the NLP model...')
+    """Callback for loading NLP model in parallelized fashion
+    """
     try:
         nlp = gensim.models.KeyedVectors.load('conceptNet', mmap='r')
         result.append(nlp)
@@ -123,6 +125,9 @@ def get_search_type(search_type):
         search4=True
     return search1, search2, search3, search4
 
+def get_clicked_path(n_clicks, paths):
+    return paths[n_clicks % len(paths)]
+
 def get_search_nodes(search, search_type, G):
     highlighted = []
     search1, search2, search3, search4 = get_search_type(search_type)
@@ -169,7 +174,7 @@ def get_search_nodes(search, search_type, G):
                         highlighted.append(node)
 
     elif search3:
-        global global_paths
+        global GLOBAL_PATHS
         searchNodes = [searched[0]]
         for i in range(1, 4):
             searchNodes.append(searched[0]+" "*i)
@@ -209,7 +214,7 @@ def get_search_nodes(search, search_type, G):
                     break
             if is_path:
                 highlighted.append(c_paths)
-        global_paths = highlighted
+        GLOBAL_PATHS = highlighted
     elif search4:
         if searched[2].isdigit():
             try:
@@ -228,9 +233,6 @@ def get_search_nodes(search, search_type, G):
         return highlighted[0], search1, search2, search3, search4
     else:
         return highlighted, search1, search2, search3, search4
-
-def get_clicked_path(n_clicks, paths):
-    return paths[n_clicks % len(paths)]
 
 def visualize_graph(G, node_pos, search_value='', search_type='', highlighted=[]):
     # Nodes information
@@ -261,8 +263,8 @@ def visualize_graph(G, node_pos, search_value='', search_type='', highlighted=[]
     # Node/Path has been searched
     elif len(search_value)>0:
         # Reset any global paths
-        global global_paths
-        global_paths=[]
+        global GLOBAL_PATHS
+        GLOBAL_PATHS=[]
         highlighted, search1, search2, search3, search4 = get_search_nodes(search_value, search_type, G)
 
         if len(highlighted)==0:
@@ -329,7 +331,7 @@ def visualize_graph(G, node_pos, search_value='', search_type='', highlighted=[]
         x0, y0 = node_pos[edge[0]]
         x1, y1 = node_pos[edge[1]]
 
-        if len(global_paths)>0:
+        if len(GLOBAL_PATHS)>0:
             changed_color=False
             for i in range(0, len(highlighted_names)-1):
                 if (((edge[0] == highlighted_names[i]) & (edge[1] == highlighted_names[i+1])) |
@@ -353,7 +355,7 @@ def visualize_graph(G, node_pos, search_value='', search_type='', highlighted=[]
             edge_labels.append((label[0], ax, ay))
 
     normal_edge_color = 'rgba(100,100,100,0.6)'
-    if len(global_paths)>0:
+    if len(GLOBAL_PATHS)>0:
         normal_edge_color = 'rgba(100,100,100,0.1)'
 
     edge_trace1['marker'] = dict(color='rgb(0,255,0)')
@@ -528,10 +530,11 @@ if __name__ == '__main__':
 
     ### Callback for loading the model
     @app.callback(
-        [dash.dependencies.Output(component_id='nlp_button', component_property='style'),],
-        [dash.dependencies.Input(component_id='nlp_button', component_property='n_clicks'),]
+        [Output(component_id='nlp_button', component_property='style')],
+        [Input(component_id='nlp_button', component_property='n_clicks')]
     )
     def load_nlp_model(n_clicks):
+        """Load the NLP model"""
         if n_clicks == 1:
             manager = multiprocessing.Manager()
             result = manager.list()
@@ -545,8 +548,6 @@ if __name__ == '__main__':
             except IndexError:
                 print('Model not integrated. Please check the above message.')
             return [{'display': 'none'}]
-        elif n_clicks > 1: # Get rid of this condition here
-            return[{'display':'none'}]
         return [{'display':'block'}]
 
     @app.callback(
@@ -557,6 +558,8 @@ if __name__ == '__main__':
          Input('search_dropdown', 'value')]
     )
     def enable_searches(model_selector_value, search_type):
+        """ Make the components available if a model number is choosen.
+            Enable the similarity search if the NLP model has been loaded."""
         if None == model_selector_value:
             return True, True, True
 
@@ -575,7 +578,7 @@ if __name__ == '__main__':
         """ Update the placeholder of the search box based on the drop-down options & reset the input's value. """
         return mode, ''
 
-    ###### Main callback
+    ###### Main callback, implement the Business Logic
     @app.callback(
         [dash.dependencies.Output(component_id='fol-graph1', component_property='figure'),
         Output('fol-graph2', 'figure'),
@@ -692,15 +695,15 @@ if __name__ == '__main__':
                     pos1 = None
                     graph1 = fig1
 
-            global global_paths
-            if len(global_paths) > 1:
+            global GLOBAL_PATHS
+            if len(GLOBAL_PATHS) > 1:
                 button_display = {'display': 'block', 'text-align': 'center', 'display': 'inline-block'}
             else:
                 button_display = {'display':'none'}
 
             if component_name == 'input':
                 graph, error = visualize_graph(G, pos, search_value, search_type)
-                if len(global_paths) > 1:
+                if len(GLOBAL_PATHS) > 1:
                     button_display = {'display': 'block', 'text-align': 'center', 'display': 'inline-block'}
                 else:
                     button_display = {'display':'none'}
@@ -708,7 +711,7 @@ if __name__ == '__main__':
             elif (component_name == 'next-path-btn'):
                 if n_clicks > 0:
                     # Display other paths
-                    highlighted = get_clicked_path(n_clicks, global_paths)
+                    highlighted = get_clicked_path(n_clicks, GLOBAL_PATHS)
                     graph, error = visualize_graph(G, pos, '', '', highlighted)
             else:
                 raise dash.exceptions.PreventUpdate
