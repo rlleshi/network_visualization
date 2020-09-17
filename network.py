@@ -551,11 +551,19 @@ if __name__ == '__main__':
         [Output('input', 'disabled'),
          Output('search_dropdown', 'disabled'),
          Output('upload-data', 'disabled')],
-        [Input('model_selector', 'value')]
+        [Input('model_selector', 'value'),
+         Input('search_dropdown', 'value')]
     )
-    def enable_searches(model_selector_value):
+    def enable_searches(model_selector_value, search_type):
         if None == model_selector_value:
             return True, True, True
+
+        print('Search Type', search_type)
+        if 'word,n' == search_type:
+            global NLP_MODEL
+            print('Type of MODEL:', type(NLP_MODEL))
+            if NLP_MODEL is None:
+                return True, False, False
         return False, False, False
 
     ###### Callback for placeholder
@@ -687,27 +695,22 @@ if __name__ == '__main__':
 
             global global_paths
             if len(global_paths) > 1:
-                button_display = {'display': 'block', 'text-align': 'center'}
+                button_display = {'display': 'block', 'text-align': 'center', 'display': 'inline-block'}
             else:
                 button_display = {'display':'none'}
 
             if component_name == 'input':
                 graph, error = visualize_graph(G, pos, search_value, search_type)
                 if len(global_paths) > 1:
-                    button_display = {'display': 'block', 'text-align': 'center'}
+                    button_display = {'display': 'block', 'text-align': 'center', 'display': 'inline-block'}
                 else:
                     button_display = {'display':'none'}
 
-                # if model == 'model1':
-                #     return graph, graph2, json.dumps(node_link_data(G)), json.dumps(pos), json.dumps(node_link_data(G2)), json.dumps(pos2), button_display, error
-                # else:
-                #     return graph1, graph, json.dumps(node_link_data(G1)), json.dumps(pos1), json.dumps(node_link_data(G)), json.dumps(pos), button_display, error
             elif (component_name == 'next-path-btn'):
                 if n_clicks > 0:
                     # Display other paths
                     highlighted = get_clicked_path(n_clicks, global_paths)
                     graph, error = visualize_graph(G, pos, '', '', highlighted)
-                    # return graph, json.dumps(nx.readwrite.json_graph.node_link_data(G)), json.dumps(pos), {'display': 'block'}, error
             else:
                 raise dash.exceptions.PreventUpdate
 
@@ -719,5 +722,5 @@ if __name__ == '__main__':
             raise dash.exceptions.PreventUpdate
 
     # app.run_server(debug=True, threaded=True)
-    app.run_server(debug=True, use_reloader=False,dev_tools_hot_reload=True)
+    app.run_server(debug=True, use_reloader=False, dev_tools_hot_reload=True)
     # app.run_server(debug=True,dev_tools_ui=False,dev_tools_props_check=False)
