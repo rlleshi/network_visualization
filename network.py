@@ -264,7 +264,7 @@ def visualize_graph(G, node_pos, search_value='', search_type='', highlighted=[]
         highlighted, search1, search2, search3, search4 = get_search_nodes(search_value, search_type, G)
 
         if len(highlighted)==0:
-            error_message="The searched node/path/similarity does not exist or the input format is incorrect."
+            error_message="Incorrect input or non-existent search term."
         else:
             # Convert to indices
             highlighted_names = highlighted
@@ -500,16 +500,14 @@ if __name__ == '__main__':
                         style={'width':'20%', 'display':'inline-block', 'margin': '20px'},
                     ),
                     html.Div(id="error", style={'color':'red'}),
-                    html.Div(id='nlp_message', style={'color':'blue'}),
+                    ### Button for graph paths
+                    html.Div(
+                        html.Button('Next Path', id='next-path-btn', n_clicks=0, hidden=True),
+                        style={'margin-bottom': '10px'}
+                    ),
                 ],
                 style = {'border': '1px dashed #6A618F', 'text-align': 'center'}
             ),
-            ### Button for graph paths
-            html.Div(
-                html.Button('Next Path', id='next-path-btn', n_clicks=0, hidden=True),
-                style={'text-align': 'center', 'margin-top': '10px'}
-            ),
-            ### Middle graph component
             html.Div(
                 children=[
                     html.Div(dcc.Graph(id='fol-graph1', figure=fig1, style={'width': '40%'}), style={'display': 'inline-block'}),
@@ -614,32 +612,33 @@ if __name__ == '__main__':
         if (component_value == None) | (component_value == 0):
             raise dash.exceptions.PreventUpdate
 
+        # No need to check if model_selector was active as it must have been since every component is otherwise disabled
         if component_name == 'upload-data':
             content = content.split(',')[1]
             decoded_content = base64.b64decode(content).decode('utf-8')
             file_extension = filepath.split(".")[1]
-            print('Model', model)
+
+            # Maybe you can make a function for all this
             if model == 'model1':
                 # check if the other model already exists
                 try:
                     G2 = node_link_graph(json.loads(G2))
                     pos2 = json.loads(pos2)
                     graph2, _ = visualize_graph(G2, pos2)
-                except TypeError:
+                except (TypeError, AttributeError):
                     G2 = nx.Graph()
                     pos2 = None
                     graph2 = fig2
-                    print("ValueError for model2")
+
             else:
                 try:
                     G1 = node_link_graph(json.loads(G1))
                     pos1 = json.loads(pos1)
                     graph1, _ = visualize_graph(G1, pos1)
-                except TypeError:
+                except (TypeError, AttributeError):
                     G1 = nx.Graph()
                     pos1 = None
                     graph1 = fig1
-                    print("ValueError for model1")
 
             # Build new graph
             nodes, edges = process_file(decoded_content, file_extension)
@@ -652,29 +651,72 @@ if __name__ == '__main__':
             else:
                 return graph1, graph, json.dumps(node_link_data(G1)), json.dumps(pos1), json.dumps(node_link_data(G)), json.dumps(pos), {'display': 'none'}, ''
 
-        else:
-            try:
-                G = nx.readwrite.json_graph.node_link_graph(json.loads(G))
-                pos = json.loads(pos)
-            except (TypeError, UnboundLocalError):
-                raise dash.exceptions.PreventUpdate
+        elif component_name != 'model_selector':
+            # Maybe you can make a function for all this
+            if model == 'model1':
+                try:
+                    G = nx.readwrite.json_graph.node_link_graph(json.loads(G1))
+                    pos = json.loads(pos1)
+                except (TypeError, UnboundLocalError):
+                    raise dash.exceptions.PreventUpdate
+
+                # check if the other model already exists
+                try:
+                    G2 = node_link_graph(json.loads(G2))
+                    pos2 = json.loads(pos2)
+                    graph2, _ = visualize_graph(G2, pos2)
+                except (TypeError, AttributeError):
+                    G2 = nx.Graph()
+                    pos2 = None
+                    graph2 = fig2
+            else:
+                try:
+                    G = nx.readwrite.json_graph.node_link_graph(json.loads(G2))
+                    pos = json.loads(pos2)
+                except (TypeError, UnboundLocalError):
+                    raise dash.exceptions.PreventUpdate
+
+                try:
+                    G1 = node_link_graph(json.loads(G1))
+                    pos1 = json.loads(pos1)
+                    graph1, _ = visualize_graph(G1, pos1)
+                except (TypeError, AttributeError):
+                    G1 = nx.Graph()
+                    pos1 = None
+                    graph1 = fig1
+
             global global_paths
+            if len(global_paths) > 1:
+                button_display = {'display': 'block', 'text-align': 'center'}
+            else:
+                button_display = {'display':'none'}
 
             if component_name == 'input':
                 graph, error = visualize_graph(G, pos, search_value, search_type)
                 if len(global_paths) > 1:
-                    button_display = {'display': 'block'}
+                    button_display = {'display': 'block', 'text-align': 'center'}
                 else:
                     button_display = {'display':'none'}
-                return graph, json.dumps(nx.readwrite.json_graph.node_link_data(G)), json.dumps(pos), button_display, error
+
+                # if model == 'model1':
+                #     return graph, graph2, json.dumps(node_link_data(G)), json.dumps(pos), json.dumps(node_link_data(G2)), json.dumps(pos2), button_display, error
+                # else:
+                #     return graph1, graph, json.dumps(node_link_data(G1)), json.dumps(pos1), json.dumps(node_link_data(G)), json.dumps(pos), button_display, error
             elif (component_name == 'next-path-btn'):
                 if n_clicks > 0:
                     # Display other paths
                     highlighted = get_clicked_path(n_clicks, global_paths)
                     graph, error = visualize_graph(G, pos, '', '', highlighted)
-                    return graph, json.dumps(nx.readwrite.json_graph.node_link_data(G)), json.dumps(pos), {'display': 'block'}, error
+                    # return graph, json.dumps(nx.readwrite.json_graph.node_link_data(G)), json.dumps(pos), {'display': 'block'}, error
             else:
                 raise dash.exceptions.PreventUpdate
+
+            if model == 'model1':
+                return graph, graph2, json.dumps(node_link_data(G)), json.dumps(pos), json.dumps(node_link_data(G2)), json.dumps(pos2), button_display, error
+            else:
+                return graph1, graph, json.dumps(node_link_data(G1)), json.dumps(pos1), json.dumps(node_link_data(G)), json.dumps(pos), button_display, error
+        else:
+            raise dash.exceptions.PreventUpdate
 
     # app.run_server(debug=True, threaded=True)
     app.run_server(debug=True, use_reloader=False,dev_tools_hot_reload=True)
