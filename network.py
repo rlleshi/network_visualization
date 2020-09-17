@@ -211,8 +211,7 @@ def get_search_nodes(search, search_type, G):
                 highlighted.append(c_paths)
         global_paths = highlighted
     elif search4:
-        #global NLP_MODEL # Can comment this out?
-        if searched[2].isdigit(): # problem here
+        if searched[2].isdigit():
             result = NLP_MODEL.most_similar(searched[0], topn=50)
             result = [res[0] for res in result if G.has_node(res[0])]
             if len(result) > int(searched[2]):
@@ -558,12 +557,9 @@ if __name__ == '__main__':
         if None == model_selector_value:
             return True, True, True
 
-        print('Search Type', search_type)
-        if 'word,n' == search_type:
-            global NLP_MODEL
-            print('Type of MODEL:', type(NLP_MODEL))
-            if NLP_MODEL is None:
+        if ('word,n' == search_type) & (NLP_MODEL is None):
                 return True, False, False
+
         return False, False, False
 
     ###### Callback for placeholder
