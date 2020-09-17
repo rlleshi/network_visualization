@@ -212,12 +212,15 @@ def get_search_nodes(search, search_type, G):
         global_paths = highlighted
     elif search4:
         if searched[2].isdigit():
-            result = NLP_MODEL.most_similar(searched[0], topn=50)
-            result = [res[0] for res in result if G.has_node(res[0])]
-            if len(result) > int(searched[2]):
-                highlighted = result[:int(searched[2])]
-            else:
-                highlighted = result
+            try:
+                result = NLP_MODEL.most_similar(searched[0], topn=50)
+                result = [res[0] for res in result if G.has_node(res[0])]
+                if len(result) > int(searched[2]):
+                    highlighted = result[:int(searched[2])]
+                else:
+                    highlighted = result
+            except KeyError: # word not in vocabulary
+                highlighted = []
 
     if len(highlighted) == 0:
         return [], False, False, False, False
