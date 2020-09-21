@@ -38,6 +38,18 @@ GLOBAL_PATHS=[]
 random.seed(3)
 NLP_MODEL = None
 
+def try_get_other_graph(G, pos, fig):
+    """ Load the other graph if it exists. Otherwise initialize it to be empty."""
+    try:
+        G = node_link_graph(json.loads(G))
+        pos = json.loads(pos)
+        graph, _ = visualize_graph(G, pos)
+    except (TypeError, AttributeError):
+        G = nx.Graph()
+        pos = None
+        graph = fig
+    return G, pos, graph
+
 def load_conceptnet_model(result):
     """Callback for loading NLP model in parallelized fashion
     """
@@ -580,47 +592,48 @@ if __name__ == '__main__':
 
     ###### Main callback, implement the Business Logic
     @app.callback(
-        [dash.dependencies.Output(component_id='fol-graph1', component_property='figure'),
+        [Output(component_id='fol-graph1', component_property='figure'),
         Output('fol-graph2', 'figure'),
-        dash.dependencies.Output('graph-intermediary', 'children'),
-        dash.dependencies.Output('graph-pos-intermediary', 'children'),
-        dash.dependencies.Output('graph-intermediary2', 'children'),
-        dash.dependencies.Output('graph-pos-intermediary2', 'children'),
-        dash.dependencies.Output('next-path-btn', 'style'),
-        dash.dependencies.Output('error', 'children')],
+        Output('graph-intermediary', 'children'),
+        Output('graph-pos-intermediary', 'children'),
+        Output('graph-intermediary2', 'children'),
+        Output('graph-pos-intermediary2', 'children'),
+        Output('next-path-btn', 'style'),
+        Output('error', 'children')],
 
-        [dash.dependencies.Input(component_id='upload-data', component_property='contents'),
+        [Input(component_id='upload-data', component_property='contents'),
         Input('model_selector', 'value'),
-        dash.dependencies.Input('input', 'value'),
-        dash.dependencies.Input('next-path-btn', 'n_clicks'),
-        dash.dependencies.Input(component_id='search_dropdown', component_property='value')],
+        Input('input', 'value'),
+        Input('next-path-btn', 'n_clicks'),
+        Input(component_id='search_dropdown', component_property='value')],
 
-        [dash.dependencies.State(component_id='upload-data', component_property='filename'),
-        dash.dependencies.State('graph-intermediary', 'children'),
-        dash.dependencies.State('graph-pos-intermediary', 'children'),
+        [State(component_id='upload-data', component_property='filename'),
+        State('graph-intermediary', 'children'),
+        State('graph-pos-intermediary', 'children'),
         State('graph-intermediary2', 'children'),
         State('graph-pos-intermediary2', 'children'),]
     )
     def process_graph(content, model, search_value, n_clicks, search_type, filepath,  G1, pos1, G2, pos2):
         """ Update/rebuild the graph when the user picks a new file or searches something.
-           Stores the graph and its nodes positions in an intermediary div.
+           Stores the graph and its nodes positions in an intermediary div (replace div with dcc.store).
            This little maneuver greatly improves run-time.
 
         Arguments:
             content -- [The content of the uploaded file]
-            search_value -- [The value searched by the user: nodes/paths]
-            n_clicks -- [Number of times the button was clicked]
+            search_value -- [The value searched by the user: nodes/paths/similarity]
+            n_clicks -- [Number of times the path-button was clicked]
             model -- [Whether the user wants to perform the first 4 searches on the first or second model]
             filepath -- [Contains the file extension. Used to differentiate .txt from .p files]
-            G -- [The graph in json format]
-            pos -- [The position of nodes in json format]
+            G1 -- [The first graph in json format]
+            pos1 -- [The corresponding position of nodes in json format]
+            G2 -- [The second graph in json format]
+            pos2 -- [The corresponding position of nodes in json format]
         """
         ctx = dash.callback_context
         component_name = ctx.triggered[0]['prop_id'].split('.')[0]
-        component_value = ctx.triggered[0]['value']
-
-        if (component_value == None) | (component_value == 0):
-            raise dash.exceptions.PreventUpdate
+        # component_value = ctx.triggered[0]['value']
+        # if (component_value == None) | (component_value == 0):
+        #     raise dash.exceptions.PreventUpdate
 
         # No need to check if model_selector was active as it must have been since every component is otherwise disabled
         if component_name == 'upload-data':
@@ -628,27 +641,10 @@ if __name__ == '__main__':
             decoded_content = base64.b64decode(content).decode('utf-8')
             file_extension = filepath.split(".")[1]
 
-            # Maybe you can make a function for all this
             if model == 'model1':
-                # check if the other model already exists
-                try:
-                    G2 = node_link_graph(json.loads(G2))
-                    pos2 = json.loads(pos2)
-                    graph2, _ = visualize_graph(G2, pos2)
-                except (TypeError, AttributeError):
-                    G2 = nx.Graph()
-                    pos2 = None
-                    graph2 = fig2
-
+                G2, pos2, graph2 = try_get_other_graph(G2, pos2, fig2)
             else:
-                try:
-                    G1 = node_link_graph(json.loads(G1))
-                    pos1 = json.loads(pos1)
-                    graph1, _ = visualize_graph(G1, pos1)
-                except (TypeError, AttributeError):
-                    G1 = nx.Graph()
-                    pos1 = None
-                    graph1 = fig1
+                G1, pos1, graph1 = try_get_other_graph(G1, pos1, fig1)
 
             # Build new graph
             nodes, edges = process_file(decoded_content, file_extension)
@@ -662,38 +658,21 @@ if __name__ == '__main__':
                 return graph1, graph, json.dumps(node_link_data(G1)), json.dumps(pos1), json.dumps(node_link_data(G)), json.dumps(pos), {'display': 'none'}, ''
 
         elif component_name != 'model_selector':
-            # Maybe you can make a function for all this
+
             if model == 'model1':
                 try:
                     G = nx.readwrite.json_graph.node_link_graph(json.loads(G1))
                     pos = json.loads(pos1)
                 except (TypeError, UnboundLocalError):
                     raise dash.exceptions.PreventUpdate
-
-                # check if the other model already exists
-                try:
-                    G2 = node_link_graph(json.loads(G2))
-                    pos2 = json.loads(pos2)
-                    graph2, _ = visualize_graph(G2, pos2)
-                except (TypeError, AttributeError):
-                    G2 = nx.Graph()
-                    pos2 = None
-                    graph2 = fig2
+                G2, pos2, graph2 = try_get_other_graph(G2, pos2, fig2)
             else:
                 try:
                     G = nx.readwrite.json_graph.node_link_graph(json.loads(G2))
                     pos = json.loads(pos2)
                 except (TypeError, UnboundLocalError):
                     raise dash.exceptions.PreventUpdate
-
-                try:
-                    G1 = node_link_graph(json.loads(G1))
-                    pos1 = json.loads(pos1)
-                    graph1, _ = visualize_graph(G1, pos1)
-                except (TypeError, AttributeError):
-                    G1 = nx.Graph()
-                    pos1 = None
-                    graph1 = fig1
+                G1, pos1, graph1 = try_get_other_graph(G1, pos1, fig1)
 
             global GLOBAL_PATHS
             if len(GLOBAL_PATHS) > 1:
