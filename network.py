@@ -55,6 +55,39 @@ def try_get_other_graph(G, pos, fig, load_type = None):
         return pos
     return G, pos, graph
 
+def get_clicked_path(n_clicks, paths):
+    return paths[n_clicks % len(paths)]
+
+def get_search_type(search_type):
+    search1, search2, search3, search4 = False, False, False, False
+    if search_type == 'node,sKx':
+        search1=True
+    elif search_type == 'node(s)':
+        search2=True
+    elif search_type == 'node1,node2':
+        search3=True
+    elif search_type == 'word,n':
+        search4=True
+
+    return search1, search2, search3, search4
+
+def unflatten(l, ind):
+    """ Unflatten a list given the starting indices of the different node groups inside that list.
+    """
+    s = 0
+    u_l = []
+    for i in range(len(ind)):
+        c_l = l[s:ind[i]+1]
+        u_l.append(c_l)
+        s = ind[i]+1
+    return u_l
+
+def rreplace(string, old, new, occurrence):
+    """ Replace the last occurrences of a string starting from the end.
+    """
+    li = string.rsplit(old, occurrence)
+    return new.join(li)
+
 def load_conceptnet_model(result):
     """Callback for loading NLP model in parallelized fashion"""
     try:
@@ -79,12 +112,6 @@ def process_file(content, file_extension):
         else:
             nodes.append(row)
     return nodes, edges
-
-def rreplace(string, old, new, occurrence):
-    """ Replace the last occurrences of a string starting from the end.
-    """
-    li = string.rsplit(old, occurrence)
-    return new.join(li)
 
 def build_graph(nodes, edges):
     """ Build a graph given its nodes and edges.
@@ -116,33 +143,6 @@ def build_graph(nodes, edges):
         second = second.replace(")", "", 1).strip()
         G.add_edge(first,second,Label=edge.split("(")[0])
     return G
-
-def unflatten(l, ind):
-    """ Unflatten a list given the starting indices of the different node groups inside that list.
-    """
-    s = 0
-    u_l = []
-    for i in range(len(ind)):
-        c_l = l[s:ind[i]+1]
-        u_l.append(c_l)
-        s = ind[i]+1
-    return u_l
-
-def get_search_type(search_type):
-    search1, search2, search3, search4 = False, False, False, False
-
-    if search_type == 'node,sKx':
-        search1=True
-    elif search_type == 'node(s)':
-        search2=True
-    elif search_type == 'node1,node2':
-        search3=True
-    elif search_type == 'word,n':
-        search4=True
-    return search1, search2, search3, search4
-
-def get_clicked_path(n_clicks, paths):
-    return paths[n_clicks % len(paths)]
 
 def get_search_nodes(search, search_type, G):
     highlighted = []
@@ -503,7 +503,7 @@ if __name__ == '__main__':
                                     {'label':'single node', 'value': 'node(s)'},
                                     {'label':'paths', 'value':'node1,node2'},
                                     {'label':'similarity', 'value':'word,n'},
-                                    {'label':'similarity-graphs', 'value':'word1,word2,n'}
+                                    {'label':'similarity-graphs', 'value':'word1,n'}
                                 ],
                                 disabled=True,
                                 value='node,sKx',
@@ -588,7 +588,7 @@ if __name__ == '__main__':
         if ('word,n' == search_type) & (NLP_MODEL is None):
             return True, False, False
 
-        if 'word1,word2,n' == search_type:
+        if 'word1,n' == search_type:
             pos1, pos2 = try_get_other_graph(G1, pos1, fig1, 'pos'), try_get_other_graph(G2, pos2, fig2, 'pos')
             if ((NLP_MODEL is None) | (not pos1) | (not pos2)):
                 return True, False, False
@@ -645,20 +645,12 @@ if __name__ == '__main__':
         """
         ctx = dash.callback_context
         component_name = ctx.triggered[0]['prop_id'].split('.')[0]
-        # component_value = ctx.triggered[0]['value']
-        # if (component_value == None) | (component_value == 0):
-        #     raise dash.exceptions.PreventUpdate
 
         # No need to check if model_selector was active as it must have been since every component is otherwise disabled
         if component_name == 'upload-data':
             content = content.split(',')[1]
             decoded_content = base64.b64decode(content).decode('utf-8')
             file_extension = filepath.split(".")[1]
-
-            if model == 'model1':
-                G2, pos2, graph2 = try_get_other_graph(G2, pos2, fig2)
-            else:
-                G1, pos1, graph1 = try_get_other_graph(G1, pos1, fig1)
 
             # Build new graph
             nodes, edges = process_file(decoded_content, file_extension)
@@ -667,37 +659,53 @@ if __name__ == '__main__':
             graph, _ = visualize_graph(G, pos)
 
             if model == 'model1':
-                return graph, graph2, json.dumps(node_link_data(G)), json.dumps(pos), json.dumps(node_link_data(G2)), json.dumps(pos2), {'display': 'none'}, ''
+                G1, pos1, graph1 = G, pos, graph
+                G2, pos2, graph2 = try_get_other_graph(G2, pos2, fig2)
             else:
-                return graph1, graph, json.dumps(node_link_data(G1)), json.dumps(pos1), json.dumps(node_link_data(G)), json.dumps(pos), {'display': 'none'}, ''
+                G2, pos2, graph2 = G, pos, graph
+                G1, pos1, graph1 = try_get_other_graph(G1, pos1, fig1)
+            return graph1, graph2, json.dumps(node_link_data(G1)), json.dumps(pos1), json.dumps(node_link_data(G2)), json.dumps(pos2), {'display': 'none'}, ''
 
         elif component_name != 'model_selector':
-
             if model == 'model1':
                 try:
-                    G = nx.readwrite.json_graph.node_link_graph(json.loads(G1))
+                    G = node_link_graph(json.loads(G1))
                     pos = json.loads(pos1)
                 except (TypeError, UnboundLocalError):
                     raise dash.exceptions.PreventUpdate
+                else:
+                    G1, pos1, graph1 = G, pos, fig1
                 G2, pos2, graph2 = try_get_other_graph(G2, pos2, fig2)
             else:
                 try:
-                    G = nx.readwrite.json_graph.node_link_graph(json.loads(G2))
+                    G = node_link_graph(json.loads(G2))
                     pos = json.loads(pos2)
                 except (TypeError, UnboundLocalError):
                     raise dash.exceptions.PreventUpdate
+                else:
+                    G2, pos2, graph2 = G, pos, fig2
                 G1, pos1, graph1 = try_get_other_graph(G1, pos1, fig1)
 
+            # Does it need to be global?
             global GLOBAL_PATHS
+            # Try to comment this section out
             if len(GLOBAL_PATHS) > 1:
                 button_display = {'text-align': 'center', 'display': 'inline-block'}
             else:
                 button_display = {'display':'none'}
 
             if component_name == 'input':
-                if search_type == 'word1,word2,n':
-                    print('Tis it')
-                graph, error = visualize_graph(G, pos, search_value, search_type)
+                if (search_type == 'word1,n') & (pos1 is not None) & (pos2 is not None) & (NLP_MODEL is not None):
+                    # search using both graphs
+                    graph1, error1 = visualize_graph(G1, pos1, search_value, 'word,n')
+                    graph2, error2 = visualize_graph(G2, pos2, search_value, 'word,n')
+                    if (error1) | (error2):
+                        error = 'Graph1: ' + error1 + '\n Graph2' + error2
+                else:
+                    # Other searches
+                    graph, error = visualize_graph(G, pos, search_value, search_type)
+
+                # Only one of these guys should be there
                 if len(GLOBAL_PATHS) > 1:
                     button_display = {'text-align': 'center', 'display': 'inline-block'}
                 else:
@@ -711,10 +719,13 @@ if __name__ == '__main__':
             else:
                 raise dash.exceptions.PreventUpdate
 
-            if model == 'model1':
-                return graph, graph2, json.dumps(node_link_data(G)), json.dumps(pos), json.dumps(node_link_data(G2)), json.dumps(pos2), button_display, error
-            else:
-                return graph1, graph, json.dumps(node_link_data(G1)), json.dumps(pos1), json.dumps(node_link_data(G)), json.dumps(pos), button_display, error
+            if search_type != 'word1,n':
+                if model == 'model1':
+                    G1, pos1, graph1 = G, pos, graph
+                else:
+                    G2, pos2, graph2 = G, pos, graph
+            return graph1, graph2, json.dumps(node_link_data(G1)), json.dumps(pos1), json.dumps(node_link_data(G2)), json.dumps(pos2), button_display, error
+
         else:
             raise dash.exceptions.PreventUpdate
 
