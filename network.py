@@ -38,8 +38,10 @@ GLOBAL_PATHS=[]
 random.seed(3)
 NLP_MODEL = None
 
-def try_get_other_graph(G, pos, fig):
-    """ Load the other graph if it exists. Otherwise initialize it to be empty."""
+def try_get_other_graph(G, pos, fig, load_type = None):
+    """ Load the other graph if it exists. Otherwise initialize it to be empty.
+        `type` represents whether we want to load all the parts of graph or just one of them.
+        When `None`, then load everything"""
     try:
         G = node_link_graph(json.loads(G))
         pos = json.loads(pos)
@@ -48,11 +50,13 @@ def try_get_other_graph(G, pos, fig):
         G = nx.Graph()
         pos = None
         graph = fig
+
+    if load_type == 'pos':
+        return pos
     return G, pos, graph
 
 def load_conceptnet_model(result):
-    """Callback for loading NLP model in parallelized fashion
-    """
+    """Callback for loading NLP model in parallelized fashion"""
     try:
         nlp = gensim.models.KeyedVectors.load('conceptNet', mmap='r')
         result.append(nlp)
@@ -498,7 +502,8 @@ if __name__ == '__main__':
                                     {'label':'node-sk', 'value': 'node,sKx'},
                                     {'label':'single node', 'value': 'node(s)'},
                                     {'label':'paths', 'value':'node1,node2'},
-                                    {'label':'similarity', 'value':'word,n'}
+                                    {'label':'similarity', 'value':'word,n'},
+                                    {'label':'similarity-graphs', 'value':'word1,word2,n'}
                                 ],
                                 disabled=True,
                                 value='node,sKx',
@@ -567,17 +572,26 @@ if __name__ == '__main__':
          Output('search_dropdown', 'disabled'),
          Output('upload-data', 'disabled')],
         [Input('model_selector', 'value'),
-         Input('search_dropdown', 'value')]
+         Input('search_dropdown', 'value')],
+        [State('graph-intermediary', 'children'),
+         State('graph-intermediary2', 'children'),
+         State('graph-pos-intermediary', 'children'),
+         State('graph-pos-intermediary2', 'children')]
     )
-    def enable_searches(model_selector_value, search_type):
-        """ Make the components available if a model number is choosen.
-            Enable the similarity search if the NLP model has been loaded."""
+    def enable_searches(model_selector_value, search_type, G1, G2, pos1, pos2):
+        """ Make the components available if a model number is choosen from the radio buttons.
+            Enable the similarity search if the NLP model has been loaded.
+            Enable the inter graph similarity search only if both models & the NLP model have been loaded."""
         if None == model_selector_value:
             return True, True, True
 
         if ('word,n' == search_type) & (NLP_MODEL is None):
-                return True, False, False
+            return True, False, False
 
+        if 'word1,word2,n' == search_type:
+            pos1, pos2 = try_get_other_graph(G1, pos1, fig1, 'pos'), try_get_other_graph(G2, pos2, fig2, 'pos')
+            if ((NLP_MODEL is None) | (not pos1) | (not pos2)):
+                return True, False, False
         return False, False, False
 
     ###### Callback for placeholder
@@ -676,14 +690,16 @@ if __name__ == '__main__':
 
             global GLOBAL_PATHS
             if len(GLOBAL_PATHS) > 1:
-                button_display = {'display': 'block', 'text-align': 'center', 'display': 'inline-block'}
+                button_display = {'text-align': 'center', 'display': 'inline-block'}
             else:
                 button_display = {'display':'none'}
 
             if component_name == 'input':
+                if search_type == 'word1,word2,n':
+                    print('Tis it')
                 graph, error = visualize_graph(G, pos, search_value, search_type)
                 if len(GLOBAL_PATHS) > 1:
-                    button_display = {'display': 'block', 'text-align': 'center', 'display': 'inline-block'}
+                    button_display = {'text-align': 'center', 'display': 'inline-block'}
                 else:
                     button_display = {'display':'none'}
 
