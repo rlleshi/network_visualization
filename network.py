@@ -688,6 +688,7 @@ if __name__ == '__main__':
 
             # Does it need to be global?
             global GLOBAL_PATHS
+            error = ''
             # Try to comment this section out
             if len(GLOBAL_PATHS) > 1:
                 button_display = {'text-align': 'center', 'display': 'inline-block'}
@@ -699,8 +700,7 @@ if __name__ == '__main__':
                     # search using both graphs
                     graph1, error1 = visualize_graph(G1, pos1, search_value, 'word,n')
                     graph2, error2 = visualize_graph(G2, pos2, search_value, 'word,n')
-                    if (error1) | (error2):
-                        error = 'Graph1: ' + error1 + '\n Graph2' + error2
+                    error = html.P([error1, html.Br(), error2])
                 else:
                     # Other searches
                     graph, error = visualize_graph(G, pos, search_value, search_type)
