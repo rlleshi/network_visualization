@@ -40,8 +40,8 @@ NLP_MODEL = None
 
 def try_get_other_graph(G, pos, fig, load_type = None):
     """ Load the other graph if it exists. Otherwise initialize it to be empty.
-        `type` represents whether we want to load all the parts of graph or just one of them.
-        When `None`, then load everything"""
+        `load_type` represents whether we want to load all the parts of graph or just one of them.
+        When `load_type = None`, load everything"""
     try:
         G = node_link_graph(json.loads(G))
         pos = json.loads(pos)
@@ -55,8 +55,8 @@ def try_get_other_graph(G, pos, fig, load_type = None):
         return pos
     return G, pos, graph
 
-def get_clicked_path(n_clicks, paths):
-    return paths[n_clicks % len(paths)]
+def get_clicked_path(n_clicks):
+    return GLOBAL_PATHS[n_clicks % len(paths)]
 
 def get_search_type(search_type):
     search1, search2, search3, search4 = False, False, False, False
@@ -413,7 +413,7 @@ def visualize_graph(G, node_pos, search_value='', search_type='', highlighted=[]
 
 
 if __name__ == '__main__':
-    # Initialize the graph with no data
+    # Initialize the graphs with no data
     fig1 = go.Figure(data=None, layout = go.Layout(
         width = 620,
         height = 550,
@@ -646,8 +646,8 @@ if __name__ == '__main__':
         ctx = dash.callback_context
         component_name = ctx.triggered[0]['prop_id'].split('.')[0]
 
-        # No need to check if model_selector was active as it must have been since every component is otherwise disabled
         if component_name == 'upload-data':
+            # Get content & decode
             content = content.split(',')[1]
             decoded_content = base64.b64decode(content).decode('utf-8')
             file_extension = filepath.split(".")[1]
@@ -669,11 +669,13 @@ if __name__ == '__main__':
         elif component_name != 'model_selector':
             if model == 'model1':
                 try:
+                    # Will be used for other searches
                     G = node_link_graph(json.loads(G1))
                     pos = json.loads(pos1)
                 except (TypeError, UnboundLocalError):
                     raise dash.exceptions.PreventUpdate
                 else:
+                    # Needed when both graphs are utilized for similarity
                     G1, pos1, graph1 = G, pos, fig1
                 G2, pos2, graph2 = try_get_other_graph(G2, pos2, fig2)
             else:
@@ -685,19 +687,11 @@ if __name__ == '__main__':
                 else:
                     G2, pos2, graph2 = G, pos, fig2
                 G1, pos1, graph1 = try_get_other_graph(G1, pos1, fig1)
-
-            # Does it need to be global?
-            global GLOBAL_PATHS
             error = ''
-            # Try to comment this section out
-            if len(GLOBAL_PATHS) > 1:
-                button_display = {'text-align': 'center', 'display': 'inline-block'}
-            else:
-                button_display = {'display':'none'}
 
             if component_name == 'input':
                 if (search_type == 'word1,n') & (pos1 is not None) & (pos2 is not None) & (NLP_MODEL is not None):
-                    # search using both graphs
+                    # search using both graphs. Using 4-th search as proxy
                     graph1, error1 = visualize_graph(G1, pos1, search_value, 'word,n')
                     graph2, error2 = visualize_graph(G2, pos2, search_value, 'word,n')
                     error = html.P([error1, html.Br(), error2])
@@ -705,21 +699,21 @@ if __name__ == '__main__':
                     # Other searches
                     graph, error = visualize_graph(G, pos, search_value, search_type)
 
-                # Only one of these guys should be there
-                if len(GLOBAL_PATHS) > 1:
-                    button_display = {'text-align': 'center', 'display': 'inline-block'}
-                else:
-                    button_display = {'display':'none'}
-
             elif (component_name == 'next-path-btn'):
                 if n_clicks > 0:
                     # Display other paths
-                    highlighted = get_clicked_path(n_clicks, GLOBAL_PATHS)
+                    highlighted = get_clicked_path(n_clicks)
                     graph, error = visualize_graph(G, pos, '', '', highlighted)
             else:
                 raise dash.exceptions.PreventUpdate
 
+            if len(GLOBAL_PATHS) > 1:
+                button_display = {'text-align': 'center', 'display': 'inline-block'}
+            else:
+                button_display = {'display':'none'}
+
             if search_type != 'word1,n':
+                # Update values as a search other than the two graph-similarity has been performed
                 if model == 'model1':
                     G1, pos1, graph1 = G, pos, graph
                 else:
