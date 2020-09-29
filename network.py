@@ -487,7 +487,6 @@ if __name__ == '__main__':
             html.Div(
                 dcc.Upload(
                     id='upload-data',
-                    disabled=True,
                     children=html.Div(['Drag and Drop or ', html.A('Select Files')]),
                     style={
                         'display': 'inline-block',
@@ -513,6 +512,7 @@ if __name__ == '__main__':
                                 {'label': '2nd Model', 'value': 'model2'}
                             ],
                             id='model_selector',
+                            value='model1',
                             persistence=True,
                             persistence_type='session'
                         ),
@@ -529,7 +529,6 @@ if __name__ == '__main__':
                                     {'label':'similarity', 'value':'word,n'},
                                     {'label':'similarity-graphs', 'value':'word1,n'}
                                 ],
-                                disabled=True,
                                 value='node,sKx',
                             ),
                             dcc.Markdown("**Search type**", style={'text-align': 'center'})
@@ -539,7 +538,7 @@ if __name__ == '__main__':
                     # Search input
                     html.Div(
                         children=[
-                            dcc.Input(id='input', type='text', disabled=True, value='', debounce=True),
+                            dcc.Input(id='input', type='text', disabled=False, value='', debounce=True),
                             dcc.Markdown("**Search**", style={'text-align': 'center'})
                         ],
                         style={'width':'20%', 'display':'inline-block', 'margin': '20px'},
@@ -591,32 +590,26 @@ if __name__ == '__main__':
             return [{'display': 'none'}]
         return [{'display':'block'}]
 
+    ###### Callback to enable & disable similarity search
     @app.callback(
-        [Output('input', 'disabled'),
-         Output('search_dropdown', 'disabled'),
-         Output('upload-data', 'disabled')],
-        [Input('model_selector', 'value'),
-         Input('search_dropdown', 'value')],
+        [Output('input', 'disabled')],
+        [Input('search_dropdown', 'value')],
         [State('graph-intermediary', 'children'),
          State('graph-intermediary2', 'children'),
          State('graph-pos-intermediary', 'children'),
          State('graph-pos-intermediary2', 'children')]
     )
-    def enable_searches(model_selector_value, search_type, G1, G2, pos1, pos2):
-        """ Make the components available if a model number is choosen from the radio buttons.
-            Enable the similarity search if the NLP model has been loaded.
+    def enable_searches(search_type, G1, G2, pos1, pos2):
+        """ Enable the single graph similarity search if the NLP model has been loaded.
             Enable the inter graph similarity search only if both models & the NLP model have been loaded."""
-        if None == model_selector_value:
-            return True, True, True
-
         if ('word,n' == search_type) & (NLP_MODEL is None):
-            return True, False, False
+            return [(False)]
 
         if 'word1,n' == search_type:
             pos1, pos2 = try_get_other_graph(G1, pos1, fig1, 'pos'), try_get_other_graph(G2, pos2, fig2, 'pos')
             if ((NLP_MODEL is None) | (not pos1) | (not pos2)):
-                return True, False, False
-        return False, False, False
+                return [(False)]
+        return [(False)]
 
     ###### Callback for placeholder
     @app.callback(
