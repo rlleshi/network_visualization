@@ -38,6 +38,11 @@ GLOBAL_PATHS=[]
 random.seed(3)
 NLP_MODEL = None
 
+def difference_magnifier(val):
+    """ val is a number between 0 & 1. Differences are magnified for the purpose of visualization."""
+    temp = np.power(4 * val, 4) / 4
+    return round(temp, 1)
+
 def try_get_other_graph(G, pos, fig, load_type = None):
     """ Load the other graph if it exists. Otherwise initialize it to be empty.
         `load_type` represents whether we want to load all the parts of graph or just one of them.
@@ -56,7 +61,7 @@ def try_get_other_graph(G, pos, fig, load_type = None):
     return G, pos, graph
 
 def get_clicked_path(n_clicks):
-    return GLOBAL_PATHS[n_clicks % len(paths)]
+    return GLOBAL_PATHS[n_clicks % len(GLOBAL_PATHS)]
 
 def get_search_type(search_type):
     search1, search2, search3, search4 = False, False, False, False
@@ -89,7 +94,7 @@ def rreplace(string, old, new, occurrence):
     return new.join(li)
 
 def load_conceptnet_model(result):
-    """Callback for loading NLP model in parallelized fashion"""
+    """Callback for loading NLP model in a parallelized fashion"""
     try:
         nlp = gensim.models.KeyedVectors.load('conceptNet', mmap='r')
         result.append(nlp)
@@ -145,7 +150,7 @@ def build_graph(nodes, edges):
     return G
 
 def get_search_nodes(search, search_type, G):
-    highlighted = []
+    highlighted, highlighted_size = [], []
     search1, search2, search3, search4 = get_search_type(search_type)
     searched = search.partition(',')
     searched = [s.strip() for s in searched]
@@ -231,26 +236,34 @@ def get_search_nodes(search, search_type, G):
             if is_path:
                 highlighted.append(c_paths)
         GLOBAL_PATHS = highlighted
-    elif search4:
-        if searched[2].isdigit():
-            try:
-                result = NLP_MODEL.most_similar(searched[0], topn=50)
-                result = [res[0] for res in result if G.has_node(res[0])]
-                if len(result) > int(searched[2]):
-                    highlighted = result[:int(searched[2])]
-                else:
-                    highlighted = result
-            except KeyError: # word not in vocabulary
-                highlighted = []
+    elif (search4) & (searched[2].isdigit()):
+        try:
+            result = NLP_MODEL.most_similar(searched[0], topn=50)
+            # TODO: remove the prints and the extra step
+            result = [(res[0], res[1]) for res in result if G.has_node(res[0])]
+            print(result)
+            result = [(res[0], difference_magnifier(res[1])) for res in result if G.has_node(res[0])]
+            print(result)
+            if len(result) > int(searched[2]):
+                highlighted = result[:int(searched[2])]
+            else:
+                highlighted = result
+            highlighted, highlighted_size = map(list, zip(*highlighted))
+        # word not in NLP vocabulary or word is already in the graph (if its there, it won't be returned with similarity=1)
+        except (KeyError, ValueError):
+            highlighted = []
 
     if len(highlighted) == 0:
-        return [], False, False, False, False
+        return [], [], False, False, False, False
+    # path search
     elif (type(highlighted[0]) is list) & (len(highlighted) > 0):
-        return highlighted[0], search1, search2, search3, search4
+        return highlighted[0], highlighted_size, search1, search2, search3, search4
     else:
-        return highlighted, search1, search2, search3, search4
+        return highlighted, highlighted_size, search1, search2, search3, search4
 
 def visualize_graph(G, node_pos, search_value='', search_type='', highlighted=[]):
+    """ First build the nodes & then the edges. #TODO: Better description """
+
     # Nodes information
     node_x = []
     node_y = []
@@ -281,7 +294,8 @@ def visualize_graph(G, node_pos, search_value='', search_type='', highlighted=[]
         # Reset any global paths
         global GLOBAL_PATHS
         GLOBAL_PATHS=[]
-        highlighted, search1, search2, search3, search4 = get_search_nodes(search_value, search_type, G)
+        # TODO: Put the search types in an array
+        highlighted, highlighted_size, search1, search2, search3, search4 = get_search_nodes(search_value, search_type, G)
 
         if len(highlighted)==0:
             error_message="Incorrect input or non-existent search term."
@@ -324,13 +338,23 @@ def visualize_graph(G, node_pos, search_value='', search_type='', highlighted=[]
     else:
         colorscale = [[0, 'rgba(41, 128, 185, 1)'], [1, 'rgba(192, 57, 43, 1)']]
 
-    node_trace = go.Scatter( x=node_x, y=node_y, text=node_labels, textposition='bottom center',
+    node_size=15
+    if search4:
+        node_size=[]
+        for i in range(len(node_x)-1):
+            if i in highlighted:
+                node_size.append(highlighted_size[highlighted.index(i)])
+            else:
+                node_size.append(15)
+
+    node_trace = go.Scatter(x=node_x, y=node_y, text=node_labels, textposition='bottom center',
                     mode='markers+text', hoverinfo='text', name='Nodes',
                     marker=dict(
                         showscale=False,
+                        size=node_size,
                         color=node_color,
                         colorscale=colorscale,
-                        size=15,
+                        # sizeref=sizeref,
                         line=dict(color='rgb(180,255,255)', width=1)
                     )
                 )
