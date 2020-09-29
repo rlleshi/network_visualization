@@ -40,7 +40,7 @@ NLP_MODEL = None
 
 def difference_magnifier(val):
     """ val is a number between 0 & 1. Differences are magnified for the purpose of visualization."""
-    temp = np.power(4 * val, 4) / 4
+    temp = np.power(4 * val, 4) / 2
     return round(temp, 1)
 
 def try_get_other_graph(G, pos, fig, load_type = None):
