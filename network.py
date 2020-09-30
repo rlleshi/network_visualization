@@ -242,13 +242,18 @@ def get_search_nodes(search, search_type, G):
             try:
                 result = NLP_MODEL.most_similar(searched[0], topn=50)
                 # TODO: remove the prints and the extra step
-                # result = [(res[0], res[1]) for res in result if G.has_node(res[0])]
-                # print(result)
+                result = [(res[0], res[1]) for res in result if G.has_node(res[0])]
+                print(result)
                 result = [(res[0], difference_magnifier(res[1])) for res in result if (G.has_node(res[0])) & (res[1]>float(thld))]
                 if len(result) > int(n):
-                    highlighted = result[:int(n)]
+                    result = result[:int(n)]
                 else:
-                    highlighted = result
+                    result = result
+                # add other nodes with the same name
+                for tup in result:
+                    for node in G.nodes:
+                        if node.lstrip(" ").rstrip(" ") == tup[0]:
+                            highlighted.append((node, tup[1]))
                 highlighted, highlighted_size = map(list, zip(*highlighted))
             # word not in NLP vocabulary or word is already in the graph (if its there, it won't be returned with similarity=1)
             except (KeyError, ValueError):
@@ -604,12 +609,12 @@ if __name__ == '__main__':
         """ Enable the single graph similarity search if the NLP model has been loaded.
             Enable the inter graph similarity search only if both models & the NLP model have been loaded."""
         if ('word,n,thld' == search_type) & (NLP_MODEL is None):
-            return [(False)]
+            return [(True)]
 
         if 'word1,n,thld' == search_type:
             pos1, pos2 = try_get_other_graph(G1, pos1, fig1, 'pos'), try_get_other_graph(G2, pos2, fig2, 'pos')
             if ((NLP_MODEL is None) | (not pos1) | (not pos2)):
-                return [(False)]
+                return [(True)]
         return [(False)]
 
     ###### Callback for placeholder
