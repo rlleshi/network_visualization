@@ -71,7 +71,7 @@ def get_search_type(search_type):
         search2=True
     elif search_type == 'node1,node2':
         search3=True
-    elif search_type == 'word,n':
+    elif search_type == 'word,n,thld':
         search4=True
 
     return search1, search2, search3, search4
@@ -236,22 +236,23 @@ def get_search_nodes(search, search_type, G):
             if is_path:
                 highlighted.append(c_paths)
         GLOBAL_PATHS = highlighted
-    elif (search4) & (searched[2].isdigit()):
-        try:
-            result = NLP_MODEL.most_similar(searched[0], topn=50)
-            # TODO: remove the prints and the extra step
-            result = [(res[0], res[1]) for res in result if G.has_node(res[0])]
-            print(result)
-            result = [(res[0], difference_magnifier(res[1])) for res in result if G.has_node(res[0])]
-            print(result)
-            if len(result) > int(searched[2]):
-                highlighted = result[:int(searched[2])]
-            else:
-                highlighted = result
-            highlighted, highlighted_size = map(list, zip(*highlighted))
-        # word not in NLP vocabulary or word is already in the graph (if its there, it won't be returned with similarity=1)
-        except (KeyError, ValueError):
-            highlighted = []
+    elif search4:
+        n, _, thld = searched[2].partition(',')
+        if n.isdigit():
+            try:
+                result = NLP_MODEL.most_similar(searched[0], topn=50)
+                # TODO: remove the prints and the extra step
+                # result = [(res[0], res[1]) for res in result if G.has_node(res[0])]
+                # print(result)
+                result = [(res[0], difference_magnifier(res[1])) for res in result if (G.has_node(res[0])) & (res[1]>float(thld))]
+                if len(result) > int(n):
+                    highlighted = result[:int(n)]
+                else:
+                    highlighted = result
+                highlighted, highlighted_size = map(list, zip(*highlighted))
+            # word not in NLP vocabulary or word is already in the graph (if its there, it won't be returned with similarity=1)
+            except (KeyError, ValueError):
+                highlighted = []
 
     if len(highlighted) == 0:
         return [], [], False, False, False, False
@@ -526,8 +527,8 @@ if __name__ == '__main__':
                                     {'label':'node-sk', 'value': 'node,sKx'},
                                     {'label':'single node', 'value': 'node(s)'},
                                     {'label':'paths', 'value':'node1,node2'},
-                                    {'label':'similarity', 'value':'word,n'},
-                                    {'label':'similarity-graphs', 'value':'word1,n'}
+                                    {'label':'similarity', 'value':'word,n,thld'},
+                                    {'label':'similarity-graphs', 'value':'word1,n,thld'}
                                 ],
                                 value='node,sKx',
                             ),
@@ -602,10 +603,10 @@ if __name__ == '__main__':
     def enable_searches(search_type, G1, G2, pos1, pos2):
         """ Enable the single graph similarity search if the NLP model has been loaded.
             Enable the inter graph similarity search only if both models & the NLP model have been loaded."""
-        if ('word,n' == search_type) & (NLP_MODEL is None):
+        if ('word,n,thld' == search_type) & (NLP_MODEL is None):
             return [(False)]
 
-        if 'word1,n' == search_type:
+        if 'word1,n,thld' == search_type:
             pos1, pos2 = try_get_other_graph(G1, pos1, fig1, 'pos'), try_get_other_graph(G2, pos2, fig2, 'pos')
             if ((NLP_MODEL is None) | (not pos1) | (not pos2)):
                 return [(False)]
@@ -707,10 +708,10 @@ if __name__ == '__main__':
             error = ''
 
             if component_name == 'input':
-                if (search_type == 'word1,n') & (pos1 is not None) & (pos2 is not None) & (NLP_MODEL is not None):
+                if (search_type == 'word1,n,thld') & (pos1 is not None) & (pos2 is not None) & (NLP_MODEL is not None):
                     # search using both graphs. Using 4-th search as proxy
-                    graph1, error1 = visualize_graph(G1, pos1, search_value, 'word,n')
-                    graph2, error2 = visualize_graph(G2, pos2, search_value, 'word,n')
+                    graph1, error1 = visualize_graph(G1, pos1, search_value, 'word,n,thld')
+                    graph2, error2 = visualize_graph(G2, pos2, search_value, 'word,n,thld')
                     error = html.P([error1, html.Br(), error2])
                 else:
                     # Other searches
@@ -729,7 +730,7 @@ if __name__ == '__main__':
             else:
                 button_display = {'display':'none'}
 
-            if search_type != 'word1,n':
+            if search_type != 'word1,n,thld':
                 # Update values as a search other than the two graph-similarity has been performed
                 if model == 'model1':
                     G1, pos1, graph1 = G, pos, graph
