@@ -1,6 +1,7 @@
 import random
 import base64
 import numpy as np
+import re
 import networkx as nx
 from networkx.readwrite.json_graph import node_link_graph, node_link_data
 import json
@@ -128,6 +129,7 @@ def build_graph(nodes, edges):
     # other nodes
     for node in nodes:
         n, sk = node.split("(",maxsplit=1)[0], rreplace(node.split("(", maxsplit=1)[1], ")", "", 1)
+        n = re.compile('[0-9]').split(n)[-1] # node pre-processing: n12thing => thing
 
         # For nodes named 'node', neato (which is used for visualization) throws an (odd) error
         if n == 'node':
