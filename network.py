@@ -40,7 +40,8 @@ NLP_MODEL = None
 
 def difference_magnifier(val):
     """ val is a number between 0 & 1. Differences are magnified for the purpose of visualization."""
-    temp = np.power(4 * val, 4) / 2
+    # temp = np.power(4 * val, 4) / 1.5
+    temp = np.power(10 * val, 2) / 1.5
     return round(temp, 1)
 
 def try_get_other_graph(G, pos, fig, load_type = None):
@@ -149,6 +150,15 @@ def build_graph(nodes, edges):
         G.add_edge(first,second,Label=edge.split("(")[0])
     return G
 
+def get_nodes(search, G):
+    """ Give a node by the user, get all the nodes to which it corresponds in the graph. """
+    nodes = []
+    for node in G.nodes:
+        if node.lstrip(" ").rstrip(" ") == search:
+            nodes.append(node)
+    return nodes
+
+
 def get_search_nodes(search, search_type, G):
     highlighted, highlighted_size = [], []
     search1, search2, search3, search4 = get_search_type(search_type)
@@ -182,9 +192,10 @@ def get_search_nodes(search, search_type, G):
 
     elif search2:
         search, rest = searched[0], searched[2]
-        for node in G.nodes:
-            if node.lstrip(" ").rstrip(" ") == search:
-                highlighted.append(node)
+        highlighted = get_nodes(search, G)
+        # for node in G.nodes:
+        #     if node.lstrip(" ").rstrip(" ") == search:
+        #         highlighted.append(node)
 
         # If the user searched more than one node
         if len(rest) > 0:
@@ -240,7 +251,7 @@ def get_search_nodes(search, search_type, G):
         n, _, thld = searched[2].partition(',')
         if n.isdigit():
             try:
-                result = NLP_MODEL.most_similar(searched[0], topn=50)
+                result = NLP_MODEL.most_similar(searched[0], topn=500) # Get the 500 most similar words
                 # TODO: remove the prints and the extra step
                 result = [(res[0], res[1]) for res in result if G.has_node(res[0])]
                 print(result)
@@ -254,7 +265,14 @@ def get_search_nodes(search, search_type, G):
                     for node in G.nodes:
                         if node.lstrip(" ").rstrip(" ") == tup[0]:
                             highlighted.append((node, tup[1]))
+                print('Searched node', searched[0])
+
+                self_nodes = get_nodes(searched[0], G)
+                for node in self_nodes:
+                    highlighted.append((node, difference_magnifier(0.47)))
+                print(highlighted)
                 highlighted, highlighted_size = map(list, zip(*highlighted))
+
             # word not in NLP vocabulary or word is already in the graph (if its there, it won't be returned with similarity=1)
             except (KeyError, ValueError):
                 highlighted = []
