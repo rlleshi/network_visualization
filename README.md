@@ -8,3 +8,7 @@ Techstack:
 3. Visualization: [Plotly](https://plotly.com/python/reference/)
 4. NLP processing: [Genism](https://radimrehurek.com/gensim/models/keyedvectors.html)
 5. NLP model: [Conceptnet Numberbatch](https://github.com/commonsense/conceptnet-numberbatch)
+
+
+## TODO
+Properly structure `network.py`
