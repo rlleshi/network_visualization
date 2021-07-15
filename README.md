@@ -12,3 +12,5 @@ Techstack:
 
 ## TODO
 Properly structure `network.py`
+
+Add a short demo
